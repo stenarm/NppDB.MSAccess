@@ -1,0 +1,9 @@
+Resource/
+test/
+**/bin/
+**/obj/
+**/Release/
+**/Debug/
+**/x86/
+*.suo
+*.sdf
