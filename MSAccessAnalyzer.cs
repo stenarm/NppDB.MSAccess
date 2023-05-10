@@ -158,8 +158,9 @@ namespace NppDB.MSAccess
                         if (ctx.selectClause.distinct != null && ctx.groupByClause != null)
                             command.AddWarning(ctx, ParserMessageType.DISTINCT_KEYWORD_WITH_GROUP_BY_CLAUSE);
                         
-                        // check for literals or columns
-                        if (ctx.groupByClause == null && ctx.selectClause._resultColumns.Count > 1 && HasAggregateFunction(ctx.selectClause))
+                        if (ctx.groupByClause == null && 
+                            ctx.selectClause._resultColumns.Any(c => c.columnExpr?.prefixedColumnName != null) &&
+                            HasAggregateFunction(ctx.selectClause))
                             command.AddWarning(ctx.selectClause, ParserMessageType.AGGREGATE_FUNCTION_WITHOUT_GROUP_BY_CLAUSE);
                         
                         var tables = ctx.fromClause?._tables;
@@ -340,7 +341,7 @@ namespace NppDB.MSAccess
                                     command.AddWarning(ctx, ParserMessageType.EQUALS_ALL);
                                 
                                 if (ctx.op.Type == MSAccessParser.NOT_EQ2 &&
-                                    ctx.selector != null && ctx.selector.Type == MSAccessParser.ANY_)
+                                    ctx.selector != null && ctx.selector.Type.In(MSAccessParser.ANY_, MSAccessParser.SOME_))
                                     command.AddWarning(ctx, ParserMessageType.NOT_EQUALS_ANY);
 
                                 if (!ctx.op.Type.In(MSAccessParser.EQ, MSAccessParser.NOT_EQ1, MSAccessParser.NOT_EQ2))
