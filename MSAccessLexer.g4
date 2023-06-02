@@ -51,6 +51,7 @@ BY_:                'BY';
 CASCADE_:           'CASCADE';
 CASE_:              'CASE';
 CAST_:              'CAST';
+CHECK_:             'CHECK';
 COLUMN_:            'COLUMN';
 COMMIT_:            'COMMIT';
 COMP_:              'COMP';

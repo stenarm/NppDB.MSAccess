@@ -25,6 +25,7 @@ keyword:
     | CASCADE_
     | CASE_
     | CAST_
+    | CHECK_
     | COLUMN_
     | COMMIT_
     | COMP_
@@ -325,6 +326,7 @@ single_field_constraint:
     PRIMARY_ KEY_
     | UNIQUE_
     | REFERENCES_ table_name (OPEN_PAR column_name CLOSE_PAR)? on_trigger*
+    | CHECK_ OPEN_PAR expr CLOSE_PAR
 ;
 
 multiple_field_constraint:
@@ -332,6 +334,7 @@ multiple_field_constraint:
         PRIMARY_ KEY_ (OPEN_PAR column_name (COMMA column_name)* CLOSE_PAR)?
         | UNIQUE_ (OPEN_PAR column_name (COMMA column_name)* CLOSE_PAR)?
         | FOREIGN_ KEY_ (NO_ INDEX_)? OPEN_PAR column_name (COMMA column_name)* CLOSE_PAR REFERENCES_ table_name (OPEN_PAR column_name (COMMA column_name)* CLOSE_PAR)? on_trigger*
+        | CHECK_ OPEN_PAR expr CLOSE_PAR
     )
 ;
 
