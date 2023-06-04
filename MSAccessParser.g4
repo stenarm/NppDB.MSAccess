@@ -67,6 +67,7 @@ keyword:
     | JOIN_
     | KEY_
     | LEFT_
+    | ALIKE_
     | LIKE_
     | TOP_
     | MATCH_
@@ -255,7 +256,7 @@ expr:
     | lhs=expr op=(EQ | NOT_EQ1 | NOT_EQ2 | LT | LT_EQ | GT | GT_EQ) selector=(ALL_ | ANY_ | SOME_) OPEN_PAR subquery=select_stmt CLOSE_PAR /* boolean */
     | lhs=expr op=IS_ inv=NOT_? rhs=expr  /* boolean */
     | lhs=expr inv=NOT_? op=IN_ OPEN_PAR (subquery=select_stmt | expressions+=expr (COMMA expressions+=expr)*) CLOSE_PAR /* boolean */
-    | lhs=expr inv=NOT_? op=(LIKE_ | REGEXP_ | MATCH_) rhs=expr (ESCAPE_ escape=expr)?  /* boolean */
+    | lhs=expr inv=NOT_? op=(LIKE_ | ALIKE_ | REGEXP_ | MATCH_) rhs=expr (ESCAPE_ escape=expr)?  /* boolean */
     | lhs=expr inv=NOT_? op=BETWEEN_ start=expr AND_ stop=expr  /* boolean */
     | lhs=expr op=XOR_ rhs=expr /* boolean */
     | lhs=expr op=AND_ rhs=expr /* boolean */

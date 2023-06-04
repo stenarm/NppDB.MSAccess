@@ -310,6 +310,7 @@ namespace NppDB.MSAccess
                         }
                         switch (ctx.op.Type)
                         {
+                            case MSAccessParser.ALIKE_:
                             case MSAccessParser.LIKE_:
                             {
                                 var rhs = ctx.rhs.GetAsSymbolOfType(MSAccessParser.STRING_LITERAL);

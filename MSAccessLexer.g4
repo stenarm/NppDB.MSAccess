@@ -92,6 +92,7 @@ IS_:                'IS';
 JOIN_:              'JOIN';
 KEY_:               'KEY';
 LEFT_:              'LEFT';
+ALIKE_:             'ALIKE';
 LIKE_:              'LIKE';
 TOP_:               'TOP';
 MATCH_:             'MATCH';
