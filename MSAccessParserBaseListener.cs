@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from C:\Users\perekond Post\Desktop\NppDB\NppDB\NppDB.MSAccess\MSAccessParser.g4 by ANTLR 4.11.1
+// Generated from C:\Users\Andres\Documents\bcS\NppDB\NppDB.MSAccess\MSAccessParser.g4 by ANTLR 4.11.1
 
 // Unreachable code detected
 #pragma warning disable 0162

@@ -148,6 +148,7 @@ keyword:
     | OLEOBJECT_
     | MEMO_
     | HYPERLINK_
+    | PERCENT_
 ;
 privilege:
     SELECT_
@@ -377,7 +378,7 @@ table_core_stmt:
 
 select_clause:
     SELECT_ distinct=(DISTINCT_ | DISTINCTROW_ | ALL_)? 
-    (TOP_ limit=NUMERIC_LITERAL)? 
+    (top=TOP_ limit=NUMERIC_LITERAL PERCENT_?)? 
     resultColumns+=result_column (COMMA resultColumns+=result_column)*
 ;
 

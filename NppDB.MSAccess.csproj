@@ -102,7 +102,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CodeCompletion.cs" />
     <Compile Include="frmMSAccessConnect.cs">
       <SubType>Form</SubType>
     </Compile>

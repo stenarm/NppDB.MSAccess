@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Antlr4.Runtime;
@@ -157,7 +158,8 @@ namespace NppDB.MSAccess
                     {
                         if (ctx.selectClause.distinct != null && ctx.groupByClause != null)
                             command.AddWarning(ctx, ParserMessageType.DISTINCT_KEYWORD_WITH_GROUP_BY_CLAUSE);
-                        
+                        if (ctx.selectClause.top != null && ctx.orderByClause == null)
+                            command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_WITHOUT_ORDER_BY_CLAUSE);
                         if (ctx.groupByClause == null && 
                             ctx.selectClause._resultColumns.Any(c => c.columnExpr?.prefixedColumnName != null) &&
                             HasAggregateFunction(ctx.selectClause))

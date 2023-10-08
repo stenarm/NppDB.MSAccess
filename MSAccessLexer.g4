@@ -177,6 +177,7 @@ AUTONUMBER_:        'AUTONUMBER';
 OLEOBJECT_:         'OLEOBJECT';
 MEMO_:              'MEMO';
 HYPERLINK_:         'HYPERLINK';
+PERCENT_:           'PERCENT';
 
 
 IDENTIFIER:
