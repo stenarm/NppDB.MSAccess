@@ -37,7 +37,7 @@ namespace NppDB.MSAccess
                 StartOffset = token.StartIndex,
                 StopLine = token.Line,
                 StopColumn = token.Column,
-                StopOffset = token.StopIndex,
+                StopOffset = token.StopIndex == token.StartIndex ? token.StopIndex + 1 : token.StopIndex,
             };
             Warnings.Add(warning);
         }

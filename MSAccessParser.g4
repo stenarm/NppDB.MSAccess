@@ -378,7 +378,7 @@ table_core_stmt:
 
 select_clause:
     SELECT_ distinct=(DISTINCT_ | DISTINCTROW_ | ALL_)? 
-    (top=TOP_ limit=NUMERIC_LITERAL PERCENT_?)? 
+    (top=TOP_ limit=NUMERIC_LITERAL percent=PERCENT_?)? 
     resultColumns+=result_column (COMMA resultColumns+=result_column)*
 ;
 
@@ -400,7 +400,7 @@ select_core_stmt:
 table_or_subquery:
     (aliased_table_name (INDEXED_ BY_ index_name | NOT_ INDEXED_)?)
     | table_name OPEN_PAR expr (COMMA expr)* CLOSE_PAR (AS_? table_alias)?
-    | OPEN_PAR (table_or_subquery (COMMA table_or_subquery)* join_clause*) CLOSE_PAR
+    | OPEN_PAR (table_or_subquery (COMMA table_or_subquery)* join_clause*) CLOSE_PAR (AS_? table_alias)?
     | OPEN_PAR select_stmt CLOSE_PAR (AS_? table_alias)?
 ;
 
@@ -409,11 +409,11 @@ table_with_joins:
 ;
 
 from_clause:
-    FROM_ tables+=table_or_subquery (COMMA tables+=table_or_subquery)*
+    FROM_ tables+=table_or_subquery (COMMA tables+=table_or_subquery)* (where_clause)?
 ;
 
 join_clause:
-    ((LEFT_ | RIGHT_) OUTER_? | INNER_) JOIN_ table_or_subquery (ON_ expr)?
+    ((LEFT_ | RIGHT_) OUTER_? | INNER_) JOIN_ table_or_subquery (on=ON_ expression=expr)?
 ;
 
 where_clause:

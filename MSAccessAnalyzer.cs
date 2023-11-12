@@ -11,10 +11,10 @@ namespace NppDB.MSAccess
     public static class MSAccessAnalyzer
     {
         public static int CollectCommands(
-            this RuleContext context, 
-            CaretPosition caretPosition, 
-            string tokenSeparator, 
-            int commandSeparatorTokenType, 
+            this RuleContext context,
+            CaretPosition caretPosition,
+            string tokenSeparator,
+            int commandSeparatorTokenType,
             out IList<ParsedTreeCommand> commands)
         {
             commands = new List<ParsedTreeCommand>();
@@ -51,7 +51,7 @@ namespace NppDB.MSAccess
                 return false;
             if (context is MSAccessParser.ExprContext thisCtx && context.Parent is MSAccessParser.ExprContext parentCtx &&
                 thisCtx.op != null && parentCtx.op != null &&
-                thisCtx.op.Type.In(MSAccessParser.AND_, MSAccessParser.OR_) && 
+                thisCtx.op.Type.In(MSAccessParser.AND_, MSAccessParser.OR_) &&
                 parentCtx.op.Type.In(MSAccessParser.AND_, MSAccessParser.OR_) &&
                 thisCtx.op.Type != parentCtx.op.Type)
             {
@@ -70,12 +70,12 @@ namespace NppDB.MSAccess
         {
             if (context is MSAccessParser.Select_stmtContext)
                 return false;
-            if (context is MSAccessParser.Function_exprContext ctx && 
+            if (context is MSAccessParser.Function_exprContext ctx &&
                 ctx.functionName.GetText().ToLower().In("sum", "avg", "min", "max", "count"))
             {
                 return true;
             }
-            
+
             for (var n = 0; n < context.ChildCount; ++n)
             {
                 var child = context.GetChild(n);
@@ -83,6 +83,81 @@ namespace NppDB.MSAccess
                 if (result) return true;
             }
             return false;
+        }
+
+        private static bool HasMultipleWheres(IParseTree context)
+        {
+            if (string.Equals(context.GetText(), "where", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            } 
+            for (var n = 0; n < context.ChildCount; ++n)
+            {
+                var child = context.GetChild(n);
+                var result = HasMultipleWheres(child);
+                if (result) return true;
+            }
+            return false;
+        }
+
+        private static bool HasWhereClause(IParseTree context)
+        {
+            if (context is MSAccessParser.Where_clauseContext)
+            {
+                return true;
+            } 
+            for (var n = 0; n < context.ChildCount; ++n)
+            {
+                var child = context.GetChild(n);
+                var result = HasWhereClause(child);
+                if (result) return true;
+            }
+            return false;
+        }
+
+        private static void FindTopWarnings(MSAccessParser.Select_core_stmtContext ctx, ParsedTreeCommand command)
+        {
+            if (ctx.orderByClause == null)
+            {
+                command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_WITHOUT_ORDER_BY_CLAUSE);
+            }
+            if (ctx.selectClause?.limit != null)
+            {
+                try
+                {
+                    int result = Int32.Parse(ctx.selectClause?.limit.Text);
+                    if (result == 1 && ctx.selectClause?.percent == null)
+                    {
+                        command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_MIGHT_RETURN_MULTIPLE_ROWS);
+                    }
+                    if (result < 1 && ctx.selectClause?.percent == null)
+                    {
+                        command.AddWarning(ctx, ParserMessageType.TOP_LIMIT_CONSTRAINT);
+                    }
+                    if ((result < 1 || result > 100) && ctx.selectClause?.percent != null)
+                    {
+                        command.AddWarning(ctx, ParserMessageType.TOP_LIMIT_PERCENT_CONSTRAINT);
+                    }
+                }
+                catch (FormatException)
+                {
+                    command.AddWarning(ctx, ParserMessageType.POSSIBLE_NON_INTEGER_VALUE_WITH_TOP);
+                }
+            }
+            IList<MSAccessParser.Result_columnContext> _resultColumns = ctx?.selectClause._resultColumns;
+            if (_resultColumns.Count == 1) 
+            {
+                foreach (MSAccessParser.Result_columnContext column in _resultColumns)
+                {
+
+                    if (column?.columnExpr?.functionExpr?.functionName?.GetText() != null
+                        && column.columnExpr.functionExpr.functionName.GetText().ToLower().In("sum", "avg", "min", "max", "count"))
+                    {
+                        command.AddWarning(ctx, ParserMessageType.ONE_ROW_IN_RESULT_WITH_TOP);
+                        continue;
+                    }
+                }
+            }
         }
 
         private static bool IsLogicalExpression(IParseTree context)
@@ -94,7 +169,7 @@ namespace NppDB.MSAccess
                 return ctx.subquery == null && (
                     ctx.literalExpr == null || ctx.literalExpr.literal.Type.In(MSAccessParser.FALSE_, MSAccessParser.TRUE_));
             }
-            
+
             return !ctx.op.Type.In(
                 MSAccessParser.STAR, MSAccessParser.DIV, MSAccessParser.IDIV, MSAccessParser.MOD_,
                 MSAccessParser.AMP, MSAccessParser.PLUS, MSAccessParser.MINUS
@@ -111,11 +186,11 @@ namespace NppDB.MSAccess
             switch (token.Type)
             {
                 case MSAccessParser.IDENTIFIER:
-                {
-                    if (token.Text[0] == '"' && token.Text[token.Text.Length - 1] == '"')
-                        command.AddWarning(token, ParserMessageType.DOUBLE_QUOTES);
-                    break;
-                }
+                    {
+                        if (token.Text[0] == '"' && token.Text[token.Text.Length - 1] == '"')
+                            command.AddWarning(token, ParserMessageType.DOUBLE_QUOTES);
+                        break;
+                    }
             }
         }
 
@@ -124,277 +199,328 @@ namespace NppDB.MSAccess
             switch (context.RuleIndex)
             {
                 case MSAccessParser.RULE_select_into_stmt:
-                {
-                    if (context is MSAccessParser.Select_into_stmtContext ctx)
                     {
-                        if (ctx.selectClause?.distinct != null && ctx.groupByClause != null)
-                            command.AddWarning(ctx, ParserMessageType.DISTINCT_KEYWORD_WITH_GROUP_BY_CLAUSE);
-                        
-                        var tables = ctx.fromClause?._tables;
-                        var joins = ctx._joinClause;
-                        var columns = ctx.selectClause?._resultColumns;
-                        if ((tables != null && tables.Count > 1 || joins != null && joins.Count > 0) && columns != null &&
-                            columns.Any(c => c.STAR() != null))
-                            command.AddWarning(ctx, ParserMessageType.SELECT_ALL_WITH_MULTIPLE_JOINS);
+                        if (context is MSAccessParser.Select_into_stmtContext ctx)
+                        {
+                            if (ctx.selectClause?.distinct != null && ctx.groupByClause != null)
+                                command.AddWarning(ctx, ParserMessageType.DISTINCT_KEYWORD_WITH_GROUP_BY_CLAUSE);
+
+                            var tables = ctx.fromClause?._tables;
+                            var joins = ctx._joinClause;
+                            var columns = ctx.selectClause?._resultColumns;
+                            if ((tables != null && tables.Count > 1 || joins != null && joins.Count > 0) && columns != null &&
+                                columns.Any(c => c.STAR() != null))
+                                command.AddWarning(ctx, ParserMessageType.SELECT_ALL_WITH_MULTIPLE_JOINS);
+                        }
+                        break;
                     }
-                    break;
-                }
                 case MSAccessParser.RULE_select_stmt:
-                {
-                    if (context is MSAccessParser.Select_stmtContext ctx && ctx._statements.Count > 1)
                     {
-                        foreach (var statement in ctx._statements)
+                        if (context is MSAccessParser.Select_stmtContext ctx && ctx._statements.Count > 1)
                         {
-                            var columns = statement.selectClause?._resultColumns;
-                            if (columns != null && columns.Any(c => c.STAR() != null || c.prefixed_star() != null))
-                                command.AddWarning(statement, ParserMessageType.SELECT_ALL_IN_UNION_STATEMENT);
-                        }
-                    }
-                    break;
-                }
-                case MSAccessParser.RULE_select_core_stmt:
-                {
-                    if (context is MSAccessParser.Select_core_stmtContext ctx)
-                    {
-                        if (ctx.selectClause.distinct != null && ctx.groupByClause != null)
-                            command.AddWarning(ctx, ParserMessageType.DISTINCT_KEYWORD_WITH_GROUP_BY_CLAUSE);
-                        if (ctx.selectClause.top != null && ctx.orderByClause == null)
-                            command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_WITHOUT_ORDER_BY_CLAUSE);
-                        if (ctx.groupByClause == null && 
-                            ctx.selectClause._resultColumns.Any(c => c.columnExpr?.prefixedColumnName != null) &&
-                            HasAggregateFunction(ctx.selectClause))
-                            command.AddWarning(ctx.selectClause, ParserMessageType.AGGREGATE_FUNCTION_WITHOUT_GROUP_BY_CLAUSE);
-                        
-                        var tables = ctx.fromClause?._tables;
-                        var joins = ctx._joinClause;
-                        var columns = ctx.selectClause._resultColumns;
-                        if ((tables != null && tables.Count > 1 || joins != null && joins.Count > 0) && columns != null &&
-                            columns.Any(c => c.STAR() != null))
-                            command.AddWarning(ctx, ParserMessageType.SELECT_ALL_WITH_MULTIPLE_JOINS);
-                        
-                        if (joins != null && joins.Count > 0 && joins.Any(j => j.LEFT_() != null || j.RIGHT_() != null) 
-                            && columns != null && columns.Any(c => c.columnExpr?.functionExpr is var f && f != null &&
-                                                                   f.functionName.GetText().ToLower() == "count" &&
-                                                                   f.STAR() != null))
-                            command.AddWarning(ctx, ParserMessageType.COUNT_FUNCTION_WITH_OUTER_JOIN);
-                    }
-                    break;
-                }
-                case MSAccessParser.RULE_insert_stmt:
-                {
-                    if (context is MSAccessParser.Insert_stmtContext ctx)
-                    {
-                        if (ctx._columnNames.Count == 0)
-                            command.AddWarning(ctx, ParserMessageType.INSERT_STATEMENT_WITHOUT_COLUMN_NAMES);
-                        
-                        var columns = ctx.subquery?.selectClause?._resultColumns;
-                        if (columns != null && columns.Any(c => c.STAR() != null || c.prefixed_star() != null))
-                            command.AddWarning(ctx.subquery, ParserMessageType.SELECT_ALL_IN_INSERT_STATEMENT);
-                    }
-                    break;
-                }
-                case MSAccessParser.RULE_order_by_clause:
-                {
-                    if (context is MSAccessParser.Order_by_clauseContext ctx)
-                    {
-                        foreach (var orderingTerm in ctx._orderingTerms)
-                        {
-                            if (orderingTerm.orderingExpr.literalExpr == null) continue;
-                            
-                            command.AddWarning(ctx, ParserMessageType.ORDERING_BY_ORDINAL);
-                        }
-                    }
-                    break;
-                }
-                case MSAccessParser.RULE_group_by_clause:
-                {
-                    if (context is MSAccessParser.Group_by_clauseContext ctx)
-                    {
-                        if (ctx.havingExpr != null && !HasAggregateFunction(ctx.havingExpr))
-                            command.AddWarning(ctx.havingExpr, ParserMessageType.HAVING_CLAUSE_WITHOUT_AGGREGATE_FUNCTION);
-                        if (ctx.havingExpr != null && HasAndOrExprWithoutParens(ctx.havingExpr))
-                            command.AddWarning(ctx.havingExpr, ParserMessageType.AND_OR_MISSING_PARENTHESES_IN_WHERE_CLAUSE);
-                        if (ctx.havingExpr != null && !IsLogicalExpression(ctx.havingExpr))
-                            command.AddWarning(ctx.havingExpr, ParserMessageType.NOT_LOGICAL_OPERAND);
-
-                        foreach (var groupingTerm in ctx._groupingTerms)
-                        {
-                            if (!HasAggregateFunction(groupingTerm)) continue;
-
-                            command.AddWarning(ctx, ParserMessageType.AGGREGATE_FUNCTION_IN_GROUP_BY_CLAUSE);
-                            break;
-                        }
-                    }
-                    break;
-                }
-                case MSAccessParser.RULE_select_clause:
-                {
-                    if (context is MSAccessParser.Select_clauseContext ctx)
-                    {
-                        for (var i = 0; i < ctx._resultColumns.Count; ++i)
-                        {
-                            var firstName = ctx._resultColumns[i].columnExpr?.prefixedColumnName?.columnName;
-                            var firstAlias = ctx._resultColumns[i].columnAlias;
-                            var firstText = firstAlias?.GetText() ?? firstName?.GetText();
-                            if (firstText == null)
-                                continue;
-
-                            for (var j = i + 1; j < ctx._resultColumns.Count; ++j)
-                            {
-                                var secondName = ctx._resultColumns[j].columnExpr?.prefixedColumnName?.columnName;
-                                var secondAlias = ctx._resultColumns[j].columnAlias;
-                                var secondText = secondAlias?.GetText() ?? secondName?.GetText();
-                                if (secondText == null || firstText != secondText)
-                                    continue;
-
-                                command.AddWarning(ctx, ParserMessageType.DUPLICATE_SELECTED_COLUMN_IN_SELECT_CLAUSE);
-                            }
-                        }
-                    }
-                    break;
-                }
-                case MSAccessParser.RULE_where_clause:
-                {
-                    if (context is MSAccessParser.Where_clauseContext ctx)
-                    {
-                        if (HasAndOrExprWithoutParens(ctx.whereExpr))
-                            command.AddWarning(ctx, ParserMessageType.AND_OR_MISSING_PARENTHESES_IN_WHERE_CLAUSE);
-                        if (HasAggregateFunction(ctx))
-                            command.AddWarning(ctx, ParserMessageType.AGGREGATE_FUNCTION_IN_WHERE_CLAUSE);
-                        if (!IsLogicalExpression(ctx.whereExpr))
-                            command.AddWarning(ctx, ParserMessageType.NOT_LOGICAL_OPERAND);
-                    }
-                    break;
-                }
-                case MSAccessParser.RULE_result_column:
-                {
-                    if (context is MSAccessParser.Result_columnContext ctx)
-                    {
-                        // there's more difficult case, where outer select statement has asterisk,
-                        // but inner statement has expression without alias
-                        if (ctx.Parent is MSAccessParser.Select_clauseContext &&
-                            (ctx.Parent.Parent is MSAccessParser.Select_into_stmtContext &&
-                             ctx.Parent.Parent.Parent is MSAccessParser.Sql_stmtContext ||
-                             ctx.Parent.Parent is MSAccessParser.Select_core_stmtContext &&
-                             ctx.Parent.Parent.Parent is MSAccessParser.Select_stmtContext &&
-                             ctx.Parent.Parent.Parent.Parent is MSAccessParser.Sql_stmtContext) &&
-                            ctx.columnExpr != null && ctx.columnAlias == null && ctx.columnExpr.prefixedColumnName == null)
-                            command.AddWarning(ctx, ParserMessageType.MISSING_COLUMN_ALIAS_IN_SELECT_CLAUSE);
-                    }
-                    break;
-                }
-                case MSAccessParser.RULE_function_expr:
-                {
-                    if (context is MSAccessParser.Function_exprContext ctx)
-                    {
-                        if (ctx.functionName.GetText().ToLower() == "sum" && ctx._params.Count == 1 && ctx._params[0].GetText() == "1")
-                            command.AddWarning(ctx, ParserMessageType.USE_COUNT_FUNCTION);
-                    }
-                    break;
-                }
-                case MSAccessParser.RULE_expr:
-                {
-                    if (context is MSAccessParser.ExprContext ctx && ctx.op != null)
-                    {
-                        if (ctx.subquery != null) 
-                        {
-                            foreach (var statement in ctx.subquery._statements)
+                            foreach (var statement in ctx._statements)
                             {
                                 var columns = statement.selectClause?._resultColumns;
-                                if (statement.selectClause?.limit == null && statement.orderByClause != null)
-                                    command.AddWarning(ctx.subquery, ParserMessageType.ORDER_BY_CLAUSE_IN_SUB_QUERY_WITHOUT_LIMIT);
-                                if ((ctx.op.Type == MSAccessParser.IN_ || ctx.selector != null) && 
-                                    columns != null && columns.Any(c => c.STAR() != null || c.prefixed_star() != null))
-                                    command.AddWarning(ctx.subquery, ParserMessageType.SELECT_ALL_IN_SUB_QUERY);
-                                if (ctx.op.Type != MSAccessParser.EXISTS_ && columns != null && columns.Count > 1)
-                                    command.AddWarning(ctx.subquery, ParserMessageType.MULTIPLE_COLUMNS_IN_SUB_QUERY);
+                                if (columns != null && columns.Any(c => c.STAR() != null || c.prefixed_star() != null))
+                                    command.AddWarning(statement, ParserMessageType.SELECT_ALL_IN_UNION_STATEMENT);
                             }
                         }
-                        switch (ctx.op.Type)
-                        {
-                            case MSAccessParser.ALIKE_:
-                            case MSAccessParser.LIKE_:
-                            {
-                                var rhs = ctx.rhs.GetAsSymbolOfType(MSAccessParser.STRING_LITERAL);
-                                if (rhs != null && !rhs.Text.Contains("%") && !rhs.Text.Contains("_"))
-                                    command.AddWarning(ctx, ParserMessageType.MISSING_WILDCARDS_IN_LIKE_EXPRESSION);
-                            }
-                            {
-                                var lhs = ctx.lhs.prefixedColumnName;
-                                var rhs = ctx.rhs.prefixedColumnName;
-                                if (lhs != null && rhs != null)
-                                    command.AddWarning(ctx, ParserMessageType.COLUMN_LIKE_COLUMN);
-                                break;
-                            }
-                            case MSAccessParser.LT:
-                            case MSAccessParser.LT_EQ:
-                            case MSAccessParser.GT:
-                            case MSAccessParser.GT_EQ:
-                            case MSAccessParser.EQ:
-                            case MSAccessParser.NOT_EQ1:
-                            case MSAccessParser.NOT_EQ2:
-                            {
-                                var lhs = ctx.lhs.GetAsSymbolOfType(MSAccessParser.NULL_);
-                                var rhs = ctx.rhs.GetAsSymbolOfType(MSAccessParser.NULL_);
-                                if (lhs != null || rhs != null)
-                                    command.AddWarning(ctx, ParserMessageType.EQUALITY_WITH_NULL);
-
-                                if (ctx.op.Type == MSAccessParser.EQ &&
-                                    ctx.selector != null && ctx.selector.Type == MSAccessParser.ALL_)
-                                    command.AddWarning(ctx, ParserMessageType.EQUALS_ALL);
-                                
-                                if (ctx.op.Type == MSAccessParser.NOT_EQ2 &&
-                                    ctx.selector != null && ctx.selector.Type.In(MSAccessParser.ANY_, MSAccessParser.SOME_))
-                                    command.AddWarning(ctx, ParserMessageType.NOT_EQUALS_ANY);
-
-                                if (!ctx.op.Type.In(MSAccessParser.EQ, MSAccessParser.NOT_EQ1, MSAccessParser.NOT_EQ2))
-                                    break;
-                                
-                                lhs = ctx.lhs.GetAsSymbolOfType(MSAccessParser.STRING_LITERAL);
-                                rhs = ctx.rhs.GetAsSymbolOfType(MSAccessParser.STRING_LITERAL);
-                                if (lhs != null && (lhs.Text.Contains("%") || lhs.Text.Contains("_")) || 
-                                    rhs != null && (rhs.Text.Contains("%") || rhs.Text.Contains("_")))
-                                    command.AddWarning(ctx, ParserMessageType.EQUALITY_WITH_TEXT_PATTERN);
-                                break;
-                            }
-                            case MSAccessParser.XOR_:
-                            case MSAccessParser.AND_:
-                            case MSAccessParser.OR_:
-                            case MSAccessParser.EQV_:
-                            {
-                                if (!IsLogicalExpression(ctx.lhs))
-                                    command.AddWarning(ctx.lhs, ParserMessageType.NOT_LOGICAL_OPERAND);
-                                if (!IsLogicalExpression(ctx.rhs))
-                                    command.AddWarning(ctx.rhs, ParserMessageType.NOT_LOGICAL_OPERAND);
-                                break;
-                            }
-                            case MSAccessParser.DIV:
-                            {
-                                var lhs = ctx.lhs.functionExpr;
-                                var rhs = ctx.rhs.functionExpr;
-                                if (lhs != null && rhs != null && 
-                                    lhs.functionName.GetText().ToLower() == "sum" && 
-                                    rhs.functionName.GetText().ToLower() == "count")
-                                    command.AddWarning(ctx, ParserMessageType.USE_AVG_FUNCTION);
-                                break;
-                            }
-                        }
+                        break;
                     }
-                    break;
-                }
+                case MSAccessParser.RULE_select_core_stmt:
+                    {
+                        if (context is MSAccessParser.Select_core_stmtContext ctx)
+                        {
+                            if (ctx.selectClause.distinct != null && ctx.groupByClause != null)
+                            {
+                                command.AddWarning(ctx, ParserMessageType.DISTINCT_KEYWORD_WITH_GROUP_BY_CLAUSE);
+                            }
+                            if (ctx.selectClause.top != null)
+                            {
+                                FindTopWarnings(ctx, command);
+                            }
+                            if (ctx.groupByClause == null &&
+                                ctx.selectClause._resultColumns.Any(c => c.columnExpr?.prefixedColumnName != null) &&
+                                HasAggregateFunction(ctx.selectClause))
+                            {
+                                command.AddWarning(ctx.selectClause, ParserMessageType.AGGREGATE_FUNCTION_WITHOUT_GROUP_BY_CLAUSE);
+                            }
+
+                            var tables = ctx.fromClause?._tables;
+                            var joins = ctx._joinClause;
+                            var columns = ctx.selectClause._resultColumns;
+                            if ((tables != null && tables.Count > 1 || joins != null && joins.Count > 0) && columns != null &&
+                                columns.Any(c => c.STAR() != null))
+                            {
+                                command.AddWarning(ctx, ParserMessageType.SELECT_ALL_WITH_MULTIPLE_JOINS);
+                            }
+
+                            if (joins != null && joins.Count > 0 && joins.Any(j => j.LEFT_() != null || j.RIGHT_() != null)
+                                && columns != null && columns.Any(c => c.columnExpr?.functionExpr is var f && f != null &&
+                                                                       f.functionName.GetText().ToLower() == "count" &&
+                                                                       f.STAR() != null))
+                            {
+                                command.AddWarning(ctx, ParserMessageType.COUNT_FUNCTION_WITH_OUTER_JOIN);
+                            }
+                            if (ctx.groupByClause != null && columns != null 
+                                && columns.Count - 1 != ctx.groupByClause._groupingTerms.Count 
+                                && columns.Count != ctx.groupByClause._groupingTerms.Count)
+                            {
+                                command.AddWarning(ctx, ParserMessageType.MISSING_COLUMN_IN_GROUP_BY_CLAUSE);
+                            }
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_insert_stmt:
+                    {
+                        if (context is MSAccessParser.Insert_stmtContext ctx)
+                        {
+                            if (ctx._columnNames.Count == 0)
+                                command.AddWarning(ctx, ParserMessageType.INSERT_STATEMENT_WITHOUT_COLUMN_NAMES);
+
+                            var columns = ctx.subquery?.selectClause?._resultColumns;
+                            if (columns != null && columns.Any(c => c.STAR() != null || c.prefixed_star() != null))
+                                command.AddWarning(ctx.subquery, ParserMessageType.SELECT_ALL_IN_INSERT_STATEMENT);
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_order_by_clause:
+                    {
+                        if (context is MSAccessParser.Order_by_clauseContext ctx)
+                        {
+                            foreach (var orderingTerm in ctx._orderingTerms)
+                            {
+                                if (orderingTerm.orderingExpr.literalExpr == null) continue;
+
+                                command.AddWarning(ctx, ParserMessageType.ORDERING_BY_ORDINAL);
+                            }
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_group_by_clause:
+                    {
+                        if (context is MSAccessParser.Group_by_clauseContext ctx)
+                        {
+                            if (ctx.havingExpr != null && !HasAggregateFunction(ctx.havingExpr))
+                                command.AddWarning(ctx.havingExpr, ParserMessageType.HAVING_CLAUSE_WITHOUT_AGGREGATE_FUNCTION);
+                            if (ctx.havingExpr != null && HasAndOrExprWithoutParens(ctx.havingExpr))
+                                command.AddWarning(ctx.havingExpr, ParserMessageType.AND_OR_MISSING_PARENTHESES_IN_WHERE_CLAUSE);
+                            if (ctx.havingExpr != null && !IsLogicalExpression(ctx.havingExpr))
+                                command.AddWarning(ctx.havingExpr, ParserMessageType.NOT_LOGICAL_OPERAND);
+
+                            foreach (var groupingTerm in ctx._groupingTerms)
+                            {
+                                if (!HasAggregateFunction(groupingTerm)) continue;
+
+                                command.AddWarning(ctx, ParserMessageType.AGGREGATE_FUNCTION_IN_GROUP_BY_CLAUSE);
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_select_clause:
+                    {
+                        if (context is MSAccessParser.Select_clauseContext ctx)
+                        {
+                            for (var i = 0; i < ctx._resultColumns.Count; ++i)
+                            {
+                                var firstName = ctx._resultColumns[i].columnExpr?.prefixedColumnName?.columnName;
+                                var firstAlias = ctx._resultColumns[i].columnAlias;
+                                var firstText = firstAlias?.GetText() ?? firstName?.GetText();
+                                if (firstText == null)
+                                    continue;
+
+                                for (var j = i + 1; j < ctx._resultColumns.Count; ++j)
+                                {
+                                    var secondName = ctx._resultColumns[j].columnExpr?.prefixedColumnName?.columnName;
+                                    var secondAlias = ctx._resultColumns[j].columnAlias;
+                                    var secondText = secondAlias?.GetText() ?? secondName?.GetText();
+                                    if (secondText == null || firstText != secondText)
+                                        continue;
+
+                                    command.AddWarning(ctx, ParserMessageType.DUPLICATE_SELECTED_COLUMN_IN_SELECT_CLAUSE);
+                                }
+                            }
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_where_clause:
+                    {
+                        if (context is MSAccessParser.Where_clauseContext ctx)
+                        {
+                            if (HasAndOrExprWithoutParens(ctx.whereExpr))
+                                command.AddWarning(ctx, ParserMessageType.AND_OR_MISSING_PARENTHESES_IN_WHERE_CLAUSE);
+                            if (HasAggregateFunction(ctx))
+                                command.AddWarning(ctx, ParserMessageType.AGGREGATE_FUNCTION_IN_WHERE_CLAUSE);
+                            if (!IsLogicalExpression(ctx.whereExpr))
+                                command.AddWarning(ctx, ParserMessageType.NOT_LOGICAL_OPERAND);
+                            if (HasMultipleWheres(ctx.whereExpr))
+                                command.AddWarning(ctx, ParserMessageType.MULTIPLE_WHERE_USED);
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_result_column:
+                    {
+                        if (context is MSAccessParser.Result_columnContext ctx)
+                        {
+                            // there's more difficult case, where outer select statement has asterisk,
+                            // but inner statement has expression without alias
+                            if (ctx.Parent is MSAccessParser.Select_clauseContext &&
+                                (ctx.Parent.Parent is MSAccessParser.Select_into_stmtContext &&
+                                 ctx.Parent.Parent.Parent is MSAccessParser.Sql_stmtContext ||
+                                 ctx.Parent.Parent is MSAccessParser.Select_core_stmtContext &&
+                                 ctx.Parent.Parent.Parent is MSAccessParser.Select_stmtContext &&
+                                 ctx.Parent.Parent.Parent.Parent is MSAccessParser.Sql_stmtContext) &&
+                                ctx.columnExpr != null && ctx.columnAlias == null && ctx.columnExpr.prefixedColumnName == null)
+                                command.AddWarning(ctx, ParserMessageType.MISSING_COLUMN_ALIAS_IN_SELECT_CLAUSE);
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_function_expr:
+                    {
+                        if (context is MSAccessParser.Function_exprContext ctx)
+                        {
+                            if (ctx.functionName.GetText().ToLower() == "sum" && ctx._params.Count == 1 && ctx._params[0].GetText() == "1")
+                                command.AddWarning(ctx, ParserMessageType.USE_COUNT_FUNCTION);
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_join_clause:
+                    {
+                        if (context is MSAccessParser.Join_clauseContext ctx)
+                        {
+                            if (ctx.on == null && ctx.expression == null)
+                            {
+                                command.AddWarning(ctx, ParserMessageType.MISSING_EXPRESSION_IN_JOIN_CLAUSE);
+                            }
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_from_clause:
+                    {
+                        if (context is MSAccessParser.From_clauseContext ctx)
+                        {
+                            if (ctx?._tables.Count > 1 && !HasWhereClause(ctx))
+                            {
+                                command.AddWarning(ctx, ParserMessageType.MISSING_EXPRESSION_IN_JOIN_CLAUSE);
+                            }
+                            if (string.Equals(ctx?.Stop?.Text, "where", StringComparison.OrdinalIgnoreCase))
+                            {
+                                command.AddWarning(ctx, ParserMessageType.MISSING_EXPRESSION_IN_WHERE_CLAUSE);
+                            }
+                            if (ctx?._table_or_subquery != null &&
+                                ctx._table_or_subquery.Start.Type == MSAccessParser.OPEN_PAR &&
+                                ctx._table_or_subquery.Stop.Type == MSAccessParser.CLOSE_PAR &&
+                                ctx._table_or_subquery.table_alias() == null)
+                            {
+                                command.AddWarning(ctx, ParserMessageType.MISSING_ALIAS_IN_FROM_SUBQUERY);
+                            }
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_expr:
+                    {
+                        if (context is MSAccessParser.ExprContext ctx && ctx.op != null)
+                        {
+                            if (ctx.subquery != null)
+                            {
+                                foreach (var statement in ctx.subquery._statements)
+                                {
+                                    var columns = statement.selectClause?._resultColumns;
+                                    if (statement.selectClause?.limit == null && statement.orderByClause != null)
+                                        command.AddWarning(ctx.subquery, ParserMessageType.ORDER_BY_CLAUSE_IN_SUB_QUERY_WITHOUT_LIMIT);
+                                    if ((ctx.op.Type == MSAccessParser.IN_ || ctx.selector != null) &&
+                                        columns != null && columns.Any(c => c.STAR() != null || c.prefixed_star() != null))
+                                        command.AddWarning(ctx.subquery, ParserMessageType.SELECT_ALL_IN_SUB_QUERY);
+                                    if (ctx.op.Type != MSAccessParser.EXISTS_ && columns != null && columns.Count > 1)
+                                        command.AddWarning(ctx.subquery, ParserMessageType.MULTIPLE_COLUMNS_IN_SUB_QUERY);
+                                }
+                            }
+                            switch (ctx.op.Type)
+                            {
+                                case MSAccessParser.ALIKE_:
+                                case MSAccessParser.LIKE_:
+                                    {
+                                        var rhs = ctx.rhs.GetAsSymbolOfType(MSAccessParser.STRING_LITERAL);
+                                        if (rhs != null && !rhs.Text.Contains("%") && !rhs.Text.Contains("_"))
+                                            command.AddWarning(ctx, ParserMessageType.MISSING_WILDCARDS_IN_LIKE_EXPRESSION);
+                                    }
+                                    {
+                                        var lhs = ctx.lhs.prefixedColumnName;
+                                        var rhs = ctx.rhs.prefixedColumnName;
+                                        if (lhs != null && rhs != null)
+                                            command.AddWarning(ctx, ParserMessageType.COLUMN_LIKE_COLUMN);
+                                        break;
+                                    }
+                                case MSAccessParser.LT:
+                                case MSAccessParser.LT_EQ:
+                                case MSAccessParser.GT:
+                                case MSAccessParser.GT_EQ:
+                                case MSAccessParser.EQ:
+                                case MSAccessParser.NOT_EQ1:
+                                case MSAccessParser.NOT_EQ2:
+                                    {
+                                        var lhs = ctx.lhs.GetAsSymbolOfType(MSAccessParser.NULL_);
+                                        var rhs = ctx.rhs.GetAsSymbolOfType(MSAccessParser.NULL_);
+                                        if (lhs != null || rhs != null)
+                                            command.AddWarning(ctx, ParserMessageType.EQUALITY_WITH_NULL);
+
+                                        if (ctx.op.Type == MSAccessParser.EQ &&
+                                            ctx.selector != null && ctx.selector.Type == MSAccessParser.ALL_)
+                                            command.AddWarning(ctx, ParserMessageType.EQUALS_ALL);
+
+                                        if (ctx.op.Type == MSAccessParser.NOT_EQ2 &&
+                                            ctx.selector != null && ctx.selector.Type.In(MSAccessParser.ANY_, MSAccessParser.SOME_))
+                                            command.AddWarning(ctx, ParserMessageType.NOT_EQUALS_ANY);
+
+                                        if (!ctx.op.Type.In(MSAccessParser.EQ, MSAccessParser.NOT_EQ1, MSAccessParser.NOT_EQ2))
+                                            break;
+
+                                        lhs = ctx.lhs.GetAsSymbolOfType(MSAccessParser.STRING_LITERAL);
+                                        rhs = ctx.rhs.GetAsSymbolOfType(MSAccessParser.STRING_LITERAL);
+                                        if (lhs != null && (lhs.Text.Contains("%") || lhs.Text.Contains("_")) ||
+                                            rhs != null && (rhs.Text.Contains("%") || rhs.Text.Contains("_")))
+                                            command.AddWarning(ctx, ParserMessageType.EQUALITY_WITH_TEXT_PATTERN);
+                                        break;
+                                    }
+                                case MSAccessParser.XOR_:
+                                case MSAccessParser.AND_:
+                                case MSAccessParser.OR_:
+                                case MSAccessParser.EQV_:
+                                    {
+                                        if (!IsLogicalExpression(ctx.lhs))
+                                            command.AddWarning(ctx.lhs, ParserMessageType.NOT_LOGICAL_OPERAND);
+                                        if (!IsLogicalExpression(ctx.rhs))
+                                            command.AddWarning(ctx.rhs, ParserMessageType.NOT_LOGICAL_OPERAND);
+                                        break;
+                                    }
+                                case MSAccessParser.DIV:
+                                    {
+                                        var lhs = ctx.lhs.functionExpr;
+                                        var rhs = ctx.rhs.functionExpr;
+                                        if (lhs != null && rhs != null &&
+                                            lhs.functionName.GetText().ToLower() == "sum" &&
+                                            rhs.functionName.GetText().ToLower() == "count")
+                                            command.AddWarning(ctx, ParserMessageType.USE_AVG_FUNCTION);
+                                        break;
+                                    }
+                            }
+                        }
+                        break;
+                    }
             }
         }
 
         private static int _CollectCommands(
-            RuleContext context, 
-            CaretPosition caretPosition, 
-            string tokenSeparator, 
-            int commandSeparatorTokenType, 
-            in IList<ParsedTreeCommand> commands, 
+            RuleContext context,
+            CaretPosition caretPosition,
+            string tokenSeparator,
+            int commandSeparatorTokenType,
+            in IList<ParsedTreeCommand> commands,
             int enclosingCommandIndex,
             in IList<StringBuilder> functionParams)
         {
-            
+
             if (context is MSAccessParser.Sql_stmtContext && commands.Last().Context == null)
             {
                 commands.Last().Context = context; // base starting branch
@@ -421,6 +547,10 @@ namespace NppDB.MSAccess
                         if (token.Type == TokenConstants.EOF)
                         {
                             continue;
+                        }
+                        if (string.IsNullOrWhiteSpace(commands.Last().Text))
+                        {
+                            commands.Last().AddWarning(token, ParserMessageType.UNNECESSARY_SEMICOLON);
                         }
                         commands.Add(new ParsedTreeCommand());
                     }
@@ -476,7 +606,7 @@ namespace NppDB.MSAccess
                         {
                             functionCallString = $"{functionName}({string.Join(", ", p).TrimEnd(',', ' ')})";
                         }
-                    
+
                         if (functionParams is null)
                         {
                             commands.Last().Text = commands.Last().Text + functionCallString + tokenSeparator;

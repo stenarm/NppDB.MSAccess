@@ -144,7 +144,7 @@ namespace NppDB.MSAccess
             return new OleDbConnection(GetConnectionString());
         }
 
-        internal ISQLExecutor CreateSQLExecutor()
+        public ISQLExecutor CreateSQLExecutor()
         {
             return new MSAccessExecutor(GetConnection);
         }
