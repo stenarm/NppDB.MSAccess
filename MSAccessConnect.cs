@@ -114,19 +114,22 @@ namespace NppDB.MSAccess
             CommandHost.Execute(NppDBCommandType.CreateResultView, new[] { id, this, CreateSQLExecutor() });
         }
 
-        public void ConnectAndAttach()
+        public string ConnectAndAttach()
         {
-            if (IsOpened || !CheckLogin()) return;
+            if (IsOpened) return "CONTINUE";
+            if (!CheckLogin()) return "FAIL";
             try
             {
                 Connect();
                 Attach();
                 Refresh();
+                return "FRESH_NODES";
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message + (ex.InnerException != null ? " : " + ex.InnerException.Message : ""));
             }
+            return "FAIL";
         }
 
         public void Disconnect()
