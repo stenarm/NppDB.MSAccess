@@ -114,6 +114,27 @@ namespace NppDB.MSAccess
             }
             return false;
         }
+        public static IParseTree FindParentOfAnyType(IParseTree context, IList<Type> targets)
+        {
+            var parent = context.Parent;
+            if (parent == null)
+            {
+                return null;
+            }
+            foreach (Type target in targets)
+            {
+                if (target.IsAssignableFrom(parent.GetType()))
+                {
+                    return parent;
+                }
+            }
+            var result = FindParentOfAnyType(parent, targets);
+            if (result != null)
+            {
+                return result;
+            }
+            return null;
+        }
 
         private static void FindTopWarnings(MSAccessParser.Select_core_stmtContext ctx, ParsedTreeCommand command)
         {
@@ -126,9 +147,22 @@ namespace NppDB.MSAccess
                 try
                 {
                     int result = Int32.Parse(ctx.selectClause?.limit.Text);
+                    IParseTree parent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.Where_clauseContext) });
                     if (result == 1 && ctx.selectClause?.percent == null)
                     {
-                        command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_MIGHT_RETURN_MULTIPLE_ROWS);
+                        if (parent != null && parent is MSAccessParser.Where_clauseContext where_ClauseContext)
+                        {
+                            if (where_ClauseContext.whereExpr == null ||
+                                (where_ClauseContext.whereExpr != null &&
+                                where_ClauseContext.whereExpr.selector == null && where_ClauseContext.whereExpr?.op?.Type != MSAccessParser.IN_))
+                            {
+                                command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_MIGHT_RETURN_MULTIPLE_ROWS);
+                            }
+                        }
+                        else 
+                        {
+                            command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_MIGHT_RETURN_MULTIPLE_ROWS);
+                        }
                     }
                     if (result < 1 && ctx.selectClause?.percent == null)
                     {

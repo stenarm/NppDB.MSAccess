@@ -187,7 +187,7 @@ IDENTIFIER:
     | [A-ZÕÄÖÜ_] [A-ZÕÄÖÜ_0-9]*
 ; // TODO check: needs more chars in set
 
-NUMERIC_LITERAL: ((DIGIT+ ('.' DIGIT*)?) | ('.' DIGIT+)) ('E' [-+]? DIGIT+)? | '0x' HEX_DIGIT+;
+NUMERIC_LITERAL: ((MINUS)?(DIGIT+ ('.' DIGIT*)?) | ('.' DIGIT+)) ('E' [-+]? DIGIT+)? | '0x' HEX_DIGIT+;
 
 BIND_PARAMETER: '?' DIGIT* | [:@$] IDENTIFIER;
 
