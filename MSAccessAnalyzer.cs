@@ -608,6 +608,10 @@ namespace NppDB.MSAccess
                         {
                             functionParams.Last().Append(child.GetText() + tokenSeparator);
                         }
+                        if (token.Type == MSAccessParser.TOP_ && i == context.ChildCount - 1) 
+                        {
+                            commands.Last().AddWarning(token, ParserMessageType.POSSIBLE_NON_INTEGER_VALUE_WITH_TOP);
+                        }
                     }
                 }
                 else

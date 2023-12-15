@@ -184,7 +184,7 @@ IDENTIFIER:
     '"' (~'"' | '""')* '"'
     | '`' (~'`' | '``')* '`'
     | '[' ~']'* ']'
-    | [A-ZÕÄÖÜ_] [A-ZÕÄÖÜ_0-9]*
+    | [\u00AA\u00B5\u00BA\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FFA-ZÕÄÖÜ_] [\u00AA\u00B5\u00BA\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FFA-ZÕÄÖÜ_0-9]*
 ; // TODO check: needs more chars in set
 
 NUMERIC_LITERAL: ((MINUS)?(DIGIT+ ('.' DIGIT*)?) | ('.' DIGIT+)) ('E' [-+]? DIGIT+)? | '0x' HEX_DIGIT+;
