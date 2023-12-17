@@ -141,27 +141,39 @@ namespace NppDB.MSAccess
             if (ctx.orderByClause == null)
             {
                 command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_WITHOUT_ORDER_BY_CLAUSE);
+                //IParseTree exprParent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.ExprContext) });
+                //IParseTree insertStmtParent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.Insert_stmtContext) });
+                //if ((exprParent != null && exprParent is MSAccessParser.ExprContext expr && expr.subquery == ctx.Parent) || 
+                //    (insertStmtParent != null && insertStmtParent is MSAccessParser.Insert_stmtContext insrt && insrt.subquery == ctx))
+                //{
+                //}
             }
             if (ctx.selectClause?.limit != null)
             {
                 try
                 {
                     int result = Int32.Parse(ctx.selectClause?.limit.Text);
-                    IParseTree parent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.Where_clauseContext) });
                     if (result == 1 && ctx.selectClause?.percent == null)
                     {
-                        if (parent != null && parent is MSAccessParser.Where_clauseContext where_ClauseContext)
+                        IParseTree exprParent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.ExprContext) });
+                        IParseTree insertStmtParent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.Insert_stmtContext) });
+                        if ((exprParent != null && exprParent is MSAccessParser.ExprContext expr && expr.subquery == ctx.Parent) ||
+                            (insertStmtParent != null && insertStmtParent is MSAccessParser.Insert_stmtContext insrt && insrt.subquery == ctx))
                         {
-                            if (where_ClauseContext.whereExpr == null ||
-                                (where_ClauseContext.whereExpr != null &&
-                                where_ClauseContext.whereExpr.selector == null && where_ClauseContext.whereExpr?.op?.Type != MSAccessParser.IN_))
+                            IParseTree parent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.Where_clauseContext) });
+                            if (parent != null && parent is MSAccessParser.Where_clauseContext where_ClauseContext)
+                            {
+                                if (where_ClauseContext.whereExpr == null ||
+                                    (where_ClauseContext.whereExpr != null &&
+                                    where_ClauseContext.whereExpr.selector == null && where_ClauseContext.whereExpr?.op?.Type != MSAccessParser.IN_))
+                                {
+                                    command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_MIGHT_RETURN_MULTIPLE_ROWS);
+                                }
+                            }
+                            else
                             {
                                 command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_MIGHT_RETURN_MULTIPLE_ROWS);
                             }
-                        }
-                        else 
-                        {
-                            command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_MIGHT_RETURN_MULTIPLE_ROWS);
                         }
                     }
                     if (result < 1 && ctx.selectClause?.percent == null)
