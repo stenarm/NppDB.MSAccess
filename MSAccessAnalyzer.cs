@@ -100,6 +100,35 @@ namespace NppDB.MSAccess
             return false;
         }
 
+        public static int CountHaving(IParseTree context, int count)
+        {
+            if (string.Equals(context.GetText(), "having", StringComparison.OrdinalIgnoreCase))
+            {
+                return count + 1;
+            }
+            for (var n = 0; n < context.ChildCount; ++n)
+            {
+                var child = context.GetChild(n);
+                count = CountHaving(child, count);
+            }
+            return count;
+        }
+
+        private static bool HasMultipleHaving(IParseTree context)
+        {
+            if (string.Equals(context.GetText(), "where", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            } 
+            for (var n = 0; n < context.ChildCount; ++n)
+            {
+                var child = context.GetChild(n);
+                var result = HasMultipleWheres(child);
+                if (result) return true;
+            }
+            return CountHaving(context, 0) > 1;
+        }
+
         private static bool HasWhereClause(IParseTree context)
         {
             if (context is MSAccessParser.Where_clauseContext)
@@ -353,6 +382,9 @@ namespace NppDB.MSAccess
                                 command.AddWarning(ctx.havingExpr, ParserMessageType.AND_OR_MISSING_PARENTHESES_IN_WHERE_CLAUSE);
                             if (ctx.havingExpr != null && !IsLogicalExpression(ctx.havingExpr))
                                 command.AddWarning(ctx.havingExpr, ParserMessageType.NOT_LOGICAL_OPERAND);
+
+                            if (HasMultipleHaving(ctx))
+                                command.AddWarning(ctx, ParserMessageType.MULTIPLE_HAVING_USED);
 
                             foreach (var groupingTerm in ctx._groupingTerms)
                             {
