@@ -37,9 +37,9 @@
             // btnClose
             // 
             this.btnClose.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnClose.Location = new System.Drawing.Point(140, 104);
+            this.btnClose.Location = new System.Drawing.Point(120, 113);
             this.btnClose.Name = "btnClose";
-            this.btnClose.Size = new System.Drawing.Size(75, 33);
+            this.btnClose.Size = new System.Drawing.Size(64, 36);
             this.btnClose.TabIndex = 8;
             this.btnClose.Text = "Cancel";
             this.btnClose.UseVisualStyleBackColor = true;
@@ -47,9 +47,9 @@
             // 
             // btnOK
             // 
-            this.btnOK.Location = new System.Drawing.Point(50, 104);
+            this.btnOK.Location = new System.Drawing.Point(43, 113);
             this.btnOK.Name = "btnOK";
-            this.btnOK.Size = new System.Drawing.Size(75, 33);
+            this.btnOK.Size = new System.Drawing.Size(64, 36);
             this.btnOK.TabIndex = 7;
             this.btnOK.Text = "OK";
             this.btnOK.UseVisualStyleBackColor = true;
@@ -57,17 +57,17 @@
             // 
             // txtPwd
             // 
-            this.txtPwd.Location = new System.Drawing.Point(50, 36);
+            this.txtPwd.Location = new System.Drawing.Point(43, 39);
             this.txtPwd.Name = "txtPwd";
-            this.txtPwd.Size = new System.Drawing.Size(164, 21);
+            this.txtPwd.Size = new System.Drawing.Size(141, 20);
             this.txtPwd.TabIndex = 9;
             // 
             // cbxShowPwd
             // 
             this.cbxShowPwd.AutoSize = true;
-            this.cbxShowPwd.Location = new System.Drawing.Point(74, 72);
+            this.cbxShowPwd.Location = new System.Drawing.Point(63, 78);
             this.cbxShowPwd.Name = "cbxShowPwd";
-            this.cbxShowPwd.Size = new System.Drawing.Size(115, 16);
+            this.cbxShowPwd.Size = new System.Drawing.Size(99, 17);
             this.cbxShowPwd.TabIndex = 10;
             this.cbxShowPwd.Text = "show password";
             this.cbxShowPwd.UseVisualStyleBackColor = true;
@@ -75,9 +75,10 @@
             // 
             // frmPassword
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
+            this.AcceptButton = this.btnOK;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(271, 176);
+            this.ClientSize = new System.Drawing.Size(232, 191);
             this.ControlBox = false;
             this.Controls.Add(this.cbxShowPwd);
             this.Controls.Add(this.txtPwd);

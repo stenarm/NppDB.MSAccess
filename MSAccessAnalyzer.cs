@@ -182,7 +182,7 @@ namespace NppDB.MSAccess
                 try
                 {
                     int result = Int32.Parse(ctx.selectClause?.limit.Text);
-                    if (result == 1 && ctx.selectClause?.percent == null)
+                    if (result >= 1)
                     {
                         IParseTree exprParent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.ExprContext) });
                         IParseTree insertStmtParent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.Insert_stmtContext) });
