@@ -434,7 +434,7 @@ insert_stmt:
 ;
 
 update_stmt:
-    UPDATE_ table_with_joins (COMMA table_with_joins)* join_clause* SET_ prefixed_column_name EQ expr (COMMA prefixed_column_name EQ expr)* (WHERE_ expr)?
+    UPDATE_ table_with_joins (COMMA table_with_joins)* join_clause* SET_ prefixed_column_name EQ expr (COMMA prefixed_column_name EQ expr)* (WHERE_ where_expr=expr)?
 ;
 
 delete_stmt:

@@ -7280,6 +7280,7 @@ public partial class MSAccessParser : Parser {
 	}
 
 	public partial class Update_stmtContext : ParserRuleContext {
+		public ExprContext where_expr;
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode UPDATE_() { return GetToken(MSAccessParser.UPDATE_, 0); }
 		[System.Diagnostics.DebuggerNonUserCode] public Table_with_joinsContext[] table_with_joins() {
 			return GetRuleContexts<Table_with_joinsContext>();
@@ -7410,7 +7411,7 @@ public partial class MSAccessParser : Parser {
 				State = 1122;
 				Match(WHERE_);
 				State = 1123;
-				expr(0);
+				_localctx.where_expr = expr(0);
 				}
 			}
 

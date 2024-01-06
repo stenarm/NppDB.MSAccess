@@ -87,6 +87,8 @@ namespace NppDB.MSAccess
 
         private static bool HasMultipleWheres(IParseTree context)
         {
+            if (context is MSAccessParser.Select_stmtContext)
+                return false;
             if (string.Equals(context.GetText(), "where", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
@@ -116,16 +118,18 @@ namespace NppDB.MSAccess
 
         private static bool HasMultipleHaving(IParseTree context)
         {
-            if (string.Equals(context.GetText(), "where", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            } 
-            for (var n = 0; n < context.ChildCount; ++n)
-            {
-                var child = context.GetChild(n);
-                var result = HasMultipleWheres(child);
-                if (result) return true;
-            }
+            //if (context is MSAccessParser.Select_stmtContext)
+            //    return false;
+            //if (string.Equals(context.GetText(), "having", StringComparison.OrdinalIgnoreCase))
+            //{
+            //    return true;
+            //} 
+            //for (var n = 0; n < context.ChildCount; ++n)
+            //{
+            //    var child = context.GetChild(n);
+            //    var result = HasMultipleHaving(child);
+            //    if (result) return true;
+            //}
             return CountHaving(context, 0) > 1;
         }
 
@@ -143,7 +147,66 @@ namespace NppDB.MSAccess
             }
             return false;
         }
-        public static IParseTree FindParentOfAnyType(IParseTree context, IList<Type> targets)
+        private static bool HasText(IParseTree ctx)
+        {
+            return ctx != null && !string.IsNullOrEmpty(ctx.GetText());
+        }
+        private static bool FromClauseIdentifiersMatchTableIdentifier(MSAccessParser.From_clauseContext ctx)
+        {
+
+            IList<IParseTree> fromAliasedTableNamesCtx = new List<IParseTree>();
+            FindAllTargetTypes(ctx, typeof(MSAccessParser.Aliased_table_nameContext), fromAliasedTableNamesCtx);
+
+            IList<IParseTree> wherePrefixedColumnNamesCtx = new List<IParseTree>();
+            FindAllTargetTypes(ctx, typeof(MSAccessParser.Prefixed_column_nameContext), wherePrefixedColumnNamesCtx);
+
+            HashSet<String> fromAliasedTableName_identifiers = new HashSet<string>();
+            foreach (IParseTree fromAliasedTableName in fromAliasedTableNamesCtx)
+            {
+                if (fromAliasedTableName is MSAccessParser.Aliased_table_nameContext aliasedTableName && HasText(aliasedTableName))
+                {
+                    if (HasText(aliasedTableName.table_alias()))
+                    {
+                        fromAliasedTableName_identifiers.Add(aliasedTableName.table_alias().GetText().ToLower());
+                    }
+                    else
+                    {
+                        fromAliasedTableName_identifiers.Add(aliasedTableName.table_name().GetText().ToLower());
+                    }
+                }
+            }
+
+
+            HashSet<String> wherePrefixedColumnName_identifiers = new HashSet<string>();
+            foreach (IParseTree wherePrefixedColumnName in wherePrefixedColumnNamesCtx)
+            {
+                if (wherePrefixedColumnName is MSAccessParser.Prefixed_column_nameContext prefixedColumnName && HasText(prefixedColumnName))
+                {
+                    if (HasText(prefixedColumnName.prefixName))
+                    {
+                        wherePrefixedColumnName_identifiers.Add(prefixedColumnName.prefixName.GetText().ToLower());
+                        //  && !prefixedColumnName.prefixName.GetText().ToLower().In(fromAliasedTableName_identifiers.ToArray())
+                        //return false;
+                    }
+                }
+            }
+
+            return fromAliasedTableName_identifiers.SetEquals(wherePrefixedColumnName_identifiers);
+        }
+
+        private static void FindAllTargetTypes(IParseTree context, Type target, IList<IParseTree> results)
+        {
+            for (var n = 0; n < context.ChildCount; ++n)
+            {
+                var child = context.GetChild(n);
+                if (target.IsAssignableFrom(child.GetType()))
+                {
+                    results.Add(child);
+                }
+                FindAllTargetTypes(child, target, results);
+            }
+        }
+        private static IParseTree FindParentOfAnyType(IParseTree context, IList<Type> targets)
         {
             var parent = context.Parent;
             if (parent == null)
@@ -163,6 +226,117 @@ namespace NppDB.MSAccess
                 return result;
             }
             return null;
+        }
+        private static IParseTree FindFirstTargetType(IParseTree context, Type target)
+        {
+            for (var n = 0; n < context.ChildCount; ++n)
+            {
+                var child = context.GetChild(n);
+                if (target.IsAssignableFrom(child.GetType()))
+                {
+                    return child;
+                }
+                var result = FindFirstTargetType(child, target);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+            return null;
+        }
+
+        private static bool IsHavingClauseUsingGroupByTerm(MSAccessParser.Group_by_clauseContext ctx)
+        {
+            HashSet<string> groupingTerms = new HashSet<string>();
+            foreach (MSAccessParser.ExprContext item in ctx._groupingTerms)
+            {
+                MSAccessParser.Column_nameContext columnRef = (MSAccessParser.Column_nameContext)FindFirstTargetType(item, typeof(MSAccessParser.Column_nameContext));
+                if (HasText(columnRef)) 
+                {
+                    groupingTerms.Add(columnRef.GetText().ToLower());
+                }
+            }
+
+            IList<IParseTree> list = new List<IParseTree>();
+            FindAllTargetTypes(ctx.havingExpr, typeof(MSAccessParser.ExprContext), list);
+            foreach (var item in list)
+            {
+                MSAccessParser.Column_nameContext columnRef = (MSAccessParser.Column_nameContext)FindFirstTargetType(item, typeof(MSAccessParser.Column_nameContext));
+                if (HasText(columnRef) && !columnRef.GetText().In(groupingTerms.ToArray()))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static void FindSelectClauseTopWarnings(MSAccessParser.Select_into_stmtContext ctx, ParsedTreeCommand command) 
+        {
+            if (ctx.orderByClause == null)
+            {
+                command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_WITHOUT_ORDER_BY_CLAUSE);
+                //IParseTree exprParent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.ExprContext) });
+                //IParseTree insertStmtParent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.Insert_stmtContext) });
+                //if ((exprParent != null && exprParent is MSAccessParser.ExprContext expr && expr.subquery == ctx.Parent) || 
+                //    (insertStmtParent != null && insertStmtParent is MSAccessParser.Insert_stmtContext insrt && insrt.subquery == ctx))
+                //{
+                //}
+            }
+            if (ctx.selectClause?.limit != null)
+            {
+                try
+                {
+                    int result = Int32.Parse(ctx.selectClause?.limit.Text);
+                    if (result >= 1)
+                    {
+                        IParseTree exprParent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.ExprContext) });
+                        IParseTree insertStmtParent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.Insert_stmtContext) });
+                        if ((exprParent != null && exprParent is MSAccessParser.ExprContext expr && expr.subquery == ctx.Parent))
+                        {
+                            IParseTree parent = FindParentOfAnyType(ctx, new List<Type> { typeof(MSAccessParser.Where_clauseContext) });
+                            if (parent != null && parent is MSAccessParser.Where_clauseContext where_ClauseContext)
+                            {
+                                if (where_ClauseContext.whereExpr == null ||
+                                    (where_ClauseContext.whereExpr != null &&
+                                    where_ClauseContext.whereExpr.selector == null && where_ClauseContext.whereExpr?.op?.Type != MSAccessParser.IN_))
+                                {
+                                    command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_MIGHT_RETURN_MULTIPLE_ROWS);
+                                }
+                            }
+                            else
+                            {
+                                command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_MIGHT_RETURN_MULTIPLE_ROWS);
+                            }
+                        }
+                    }
+                    if (result < 1 && ctx.selectClause?.percent == null)
+                    {
+                        command.AddWarning(ctx, ParserMessageType.TOP_LIMIT_CONSTRAINT);
+                    }
+                    if ((result < 1 || result > 100) && ctx.selectClause?.percent != null)
+                    {
+                        command.AddWarning(ctx, ParserMessageType.TOP_LIMIT_PERCENT_CONSTRAINT);
+                    }
+                }
+                catch (FormatException)
+                {
+                    command.AddWarning(ctx, ParserMessageType.POSSIBLE_NON_INTEGER_VALUE_WITH_TOP);
+                }
+            }
+            IList<MSAccessParser.Result_columnContext> _resultColumns = ctx?.selectClause._resultColumns;
+            if (_resultColumns.Count == 1)
+            {
+                foreach (MSAccessParser.Result_columnContext column in _resultColumns)
+                {
+
+                    if (column?.columnExpr?.functionExpr?.functionName?.GetText() != null
+                        && column.columnExpr.functionExpr.functionName.GetText().ToLower().In("sum", "avg", "min", "max", "count"))
+                    {
+                        command.AddWarning(ctx, ParserMessageType.ONE_ROW_IN_RESULT_WITH_TOP);
+                        continue;
+                    }
+                }
+            }
         }
 
         private static void FindTopWarnings(MSAccessParser.Select_core_stmtContext ctx, ParsedTreeCommand command)
@@ -198,6 +372,10 @@ namespace NppDB.MSAccess
                                 {
                                     command.AddWarning(ctx, ParserMessageType.TOP_KEYWORD_MIGHT_RETURN_MULTIPLE_ROWS);
                                 }
+                            }
+                            else if (exprParent != null && exprParent is MSAccessParser.ExprContext x && x.IN_() != null)
+                            {
+                                // do nothing idc
                             }
                             else
                             {
@@ -250,6 +428,27 @@ namespace NppDB.MSAccess
                 MSAccessParser.AMP, MSAccessParser.PLUS, MSAccessParser.MINUS
             );
         }
+        public static bool HasSpecificAggregateFunctionAndArgument(IParseTree context, string argument, params string[] functionNames)
+        {
+            if (context is MSAccessParser.Function_exprContext ctx &&
+                ctx.functionName.GetText().ToLower().In(functionNames) &&
+                (ctx._param_expr?.GetText().ToLower() == argument ||
+                (HasText(ctx.STAR()) && argument == "*")))
+            {
+                return true;
+            }
+
+            for (var n = 0; n < context.ChildCount; ++n)
+            {
+                var child = context.GetChild(n);
+                if (!(child is MSAccessParser.Select_clauseContext))
+                {
+                    var result = HasSpecificAggregateFunctionAndArgument(child, argument, functionNames);
+                    if (result) return true;
+                }
+            }
+            return false;
+        }
 
         private static bool In<T>(this T x, params T[] set)
         {
@@ -277,15 +476,25 @@ namespace NppDB.MSAccess
                     {
                         if (context is MSAccessParser.Select_into_stmtContext ctx)
                         {
-                            if (ctx.selectClause?.distinct != null && ctx.groupByClause != null)
+                            if (ctx.selectClause?.distinct != null && ctx.groupByClause != null) 
+                            {
+
                                 command.AddWarning(ctx, ParserMessageType.DISTINCT_KEYWORD_WITH_GROUP_BY_CLAUSE);
+                            }
+                            if (ctx.selectClause.top != null)
+                            {
+                                FindSelectClauseTopWarnings(ctx, command);
+                            }
 
                             var tables = ctx.fromClause?._tables;
                             var joins = ctx._joinClause;
                             var columns = ctx.selectClause?._resultColumns;
                             if ((tables != null && tables.Count > 1 || joins != null && joins.Count > 0) && columns != null &&
-                                columns.Any(c => c.STAR() != null))
+                                columns.Any(c => c.STAR() != null)) 
+                            {
+
                                 command.AddWarning(ctx, ParserMessageType.SELECT_ALL_WITH_MULTIPLE_JOINS);
+                            }
                         }
                         break;
                     }
@@ -331,9 +540,7 @@ namespace NppDB.MSAccess
                             }
 
                             if (joins != null && joins.Count > 0 && joins.Any(j => j.LEFT_() != null || j.RIGHT_() != null)
-                                && columns != null && columns.Any(c => c.columnExpr?.functionExpr is var f && f != null &&
-                                                                       f.functionName.GetText().ToLower() == "count" &&
-                                                                       f.STAR() != null))
+                                && HasSpecificAggregateFunctionAndArgument(ctx, "*", "count"))
                             {
                                 command.AddWarning(ctx, ParserMessageType.COUNT_FUNCTION_WITH_OUTER_JOIN);
                             }
@@ -376,15 +583,6 @@ namespace NppDB.MSAccess
                     {
                         if (context is MSAccessParser.Group_by_clauseContext ctx)
                         {
-                            if (ctx.havingExpr != null && !HasAggregateFunction(ctx.havingExpr))
-                                command.AddWarning(ctx.havingExpr, ParserMessageType.HAVING_CLAUSE_WITHOUT_AGGREGATE_FUNCTION);
-                            if (ctx.havingExpr != null && HasAndOrExprWithoutParens(ctx.havingExpr))
-                                command.AddWarning(ctx.havingExpr, ParserMessageType.AND_OR_MISSING_PARENTHESES_IN_WHERE_CLAUSE);
-                            if (ctx.havingExpr != null && !IsLogicalExpression(ctx.havingExpr))
-                                command.AddWarning(ctx.havingExpr, ParserMessageType.NOT_LOGICAL_OPERAND);
-
-                            if (HasMultipleHaving(ctx))
-                                command.AddWarning(ctx, ParserMessageType.MULTIPLE_HAVING_USED);
 
                             foreach (var groupingTerm in ctx._groupingTerms)
                             {
@@ -393,6 +591,29 @@ namespace NppDB.MSAccess
                                 command.AddWarning(ctx, ParserMessageType.AGGREGATE_FUNCTION_IN_GROUP_BY_CLAUSE);
                                 break;
                             }
+                            if (ctx.havingExpr != null) 
+                            {
+                                if (ctx.havingExpr?.exception != null)
+                                {
+                                    command.AddWarning(ctx, ParserMessageType.MISSING_EXPRESSION_IN_HAVING_CLAUSE);
+                                    break;
+                                }
+                                if (ctx.havingExpr.ChildCount == 1)
+                                {
+                                    command.AddWarning(ctx, ParserMessageType.MISSING_EXPRESSION_IN_HAVING_CLAUSE);
+                                    break;
+                                }
+                                if (!HasAggregateFunction(ctx.havingExpr) && !IsHavingClauseUsingGroupByTerm(ctx))
+                                    command.AddWarning(ctx.havingExpr, ParserMessageType.HAVING_CLAUSE_WITHOUT_AGGREGATE_FUNCTION);
+                                if (HasAndOrExprWithoutParens(ctx.havingExpr))
+                                    command.AddWarning(ctx.havingExpr, ParserMessageType.AND_OR_MISSING_PARENTHESES_IN_WHERE_CLAUSE);
+                                if (!IsLogicalExpression(ctx.havingExpr))
+                                    command.AddWarning(ctx.havingExpr, ParserMessageType.NOT_LOGICAL_OPERAND);
+                            }
+
+                            if (HasMultipleHaving(ctx))
+                                command.AddWarning(ctx, ParserMessageType.MULTIPLE_HAVING_USED);
+
                         }
                         break;
                     }
@@ -478,9 +699,16 @@ namespace NppDB.MSAccess
                     {
                         if (context is MSAccessParser.From_clauseContext ctx)
                         {
-                            if (ctx?._tables.Count > 1 && !HasWhereClause(ctx))
+                            if (ctx?._tables.Count > 1)
                             {
-                                command.AddWarning(ctx, ParserMessageType.MISSING_EXPRESSION_IN_JOIN_CLAUSE);
+                                if (!HasWhereClause(ctx))
+                                {
+                                    command.AddWarning(ctx, ParserMessageType.MISSING_EXPRESSION_IN_JOIN_CLAUSE);
+                                } 
+                                else if (!FromClauseIdentifiersMatchTableIdentifier(ctx))
+                                {
+                                    command.AddWarning(ctx, ParserMessageType.MISSING_EXPRESSION_IN_JOIN_CLAUSE);
+                                }
                             }
                             if (string.Equals(ctx?.Stop?.Text, "where", StringComparison.OrdinalIgnoreCase))
                             {
@@ -492,6 +720,42 @@ namespace NppDB.MSAccess
                                 ctx._table_or_subquery.table_alias() == null)
                             {
                                 command.AddWarning(ctx, ParserMessageType.MISSING_ALIAS_IN_FROM_SUBQUERY);
+                            }
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_delete_stmt:
+                    {
+                        if (context is MSAccessParser.Delete_stmtContext ctx)
+                        {
+
+                            IList<IParseTree> list = new List<IParseTree>();
+                            FindAllTargetTypes(ctx, typeof(MSAccessParser.Table_with_joinsContext), list);
+                            if (ctx.WHERE_() == null)
+                            {
+                                foreach (IParseTree item in list)
+                                {
+                                    if (item is MSAccessParser.Table_with_joinsContext joinsCtx && HasText(joinsCtx)) 
+                                    {
+                                        MSAccessParser.Table_aliasContext table_aliasContext = joinsCtx.aliased_table_name()?.table_alias();
+                                        if (HasText(table_aliasContext) && string.Equals(table_aliasContext.GetText(), "where", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            command.AddWarning(ctx, ParserMessageType.MISSING_EXPRESSION_IN_WHERE_CLAUSE);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    }
+                case MSAccessParser.RULE_update_stmt:
+                    {
+                        if (context is MSAccessParser.Update_stmtContext updctx)
+                        {
+                            if (updctx.WHERE_() != null && updctx.where_expr?.exception != null)
+                            {
+                                command.AddWarning(updctx, ParserMessageType.MISSING_EXPRESSION_IN_WHERE_CLAUSE);
                             }
                         }
                         break;
