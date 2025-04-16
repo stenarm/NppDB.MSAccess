@@ -1,6 +1,6 @@
 ﻿namespace NppDB.MSAccess
 {
-    partial class frmMSAccessConnect
+    partial class FrmMsAccessConnect
     {
         /// <summary>
         /// Required designer variable.
@@ -89,7 +89,7 @@
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            this.Name = "frmMSAccessConnect";
+            this.Name = "FrmMsAccessConnect";
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "MSAccess Connect";

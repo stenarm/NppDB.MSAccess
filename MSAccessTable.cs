@@ -20,7 +20,7 @@ namespace NppDB.MSAccess
 
         public virtual void Refresh()
         {
-            var conn = (MSAccessConnect)Parent.Parent.Parent;
+            var conn = (MsAccessConnect)Parent.Parent.Parent;
             using (var cnn = conn.GetConnection())
             {
                 TreeView.Enabled = false;
@@ -71,7 +71,7 @@ namespace NppDB.MSAccess
                 var id = host.Execute(NppDBCommandType.GetActivatedBufferID, null);
                 var query = "SELECT TOP 100 * FROM " + Text;
                 host.Execute(NppDBCommandType.AppendToCurrentView, new object[] { query });
-                host.Execute(NppDBCommandType.CreateResultView, new[] { id, connect, connect.CreateSQLExecutor() });
+                host.Execute(NppDBCommandType.CreateResultView, new[] { id, connect, connect.CreateSqlExecutor() });
                 host.Execute(NppDBCommandType.ExecuteSQL, new[] { id, query });
             }));
             menuList.Items.Add(new ToolStripButton("Drop", null, (s, e) =>
@@ -83,9 +83,9 @@ namespace NppDB.MSAccess
             return menuList;
         }
 
-        private MSAccessConnect GetDBConnect()
+        private MsAccessConnect GetDBConnect()
         {
-            var connect = Parent.Parent.Parent as MSAccessConnect;
+            var connect = Parent.Parent.Parent as MsAccessConnect;
             return connect;
         }
 

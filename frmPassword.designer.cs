@@ -1,6 +1,6 @@
 ﻿namespace NppDB.MSAccess
 {
-    partial class frmPassword
+    partial class FrmPassword
     {
         /// <summary>
         /// Required designer variable.
@@ -87,7 +87,7 @@
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            this.Name = "frmPassword";
+            this.Name = "FrmPassword";
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Password";

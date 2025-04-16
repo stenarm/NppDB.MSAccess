@@ -27,7 +27,7 @@ namespace NppDB.MSAccess
 
         public void Refresh()
         {
-            var conn = (MSAccessConnect)Parent.Parent;
+            var conn = (MsAccessConnect)Parent.Parent;
             using (var cnn = conn.GetConnection())
             {
                 TreeView.Cursor = Cursors.WaitCursor;

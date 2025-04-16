@@ -17,7 +17,7 @@ namespace NppDB.MSAccess
         public override void SyntaxError(TextWriter output, IRecognizer recognizer, 
             int offendingSymbol, int line, int col, string msg, RecognitionException e)
         {
-            Console.WriteLine($"LEXER ERROR: {e?.GetType().ToString() ?? ""}: {msg} ({line}:{col})");
+            Console.WriteLine($@"LEXER ERROR: {e?.GetType().ToString() ?? ""}: {msg} ({line}:{col})");
         }
     }
 
@@ -29,7 +29,7 @@ namespace NppDB.MSAccess
         public override void SyntaxError(TextWriter output, IRecognizer recognizer, 
             IToken offendingSymbol, int line, int col, string msg, RecognitionException e)
         {
-            Console.WriteLine($"PARSER ERROR: {e?.GetType().ToString() ?? ""}: {msg} ({line}:{col})");
+            Console.WriteLine($@"PARSER ERROR: {e?.GetType().ToString() ?? ""}: {msg} ({line}:{col})");
             _errors.Add(new ParserError
             {
                 Text = msg,
@@ -68,7 +68,7 @@ namespace NppDB.MSAccess
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Lexer Exception: {e}");
+                Console.WriteLine($@"Lexer Exception: {e}");
                 throw e;
             }
 
@@ -89,7 +89,7 @@ namespace NppDB.MSAccess
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Parser Exception: {e}");
+                Console.WriteLine($@"Parser Exception: {e}");
                 throw e;
             }
         }
@@ -111,7 +111,7 @@ namespace NppDB.MSAccess
                                 if (string.IsNullOrWhiteSpace(sql)) continue;
                                 lastSql = sql;
 
-                                Console.WriteLine($"SQL: <{sql}>");
+                                Console.WriteLine($@"SQL: <{sql}>");
                                 var cmd = new OleDbCommand(sql, conn);
                                 var rd = cmd.ExecuteReader();
                                 var dt = new DataTable();
