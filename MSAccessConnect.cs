@@ -13,7 +13,7 @@ namespace NppDB.MSAccess
 {
     [XmlRoot]
     [ConnectAttr(Id = "MSAccessConnect", Title = "MS Access")]
-    public class MsAccessConnect : TreeNode, IDBConnect, IRefreshable, IMenuProvider, IIconProvider, INppDBCommandClient
+    public class MsAccessConnect : TreeNode, IDbConnect, IRefreshable, IMenuProvider, IIconProvider, INppDBCommandClient
     {
         [XmlElement]
         public string Title { set => Text = value; get => Text; }
@@ -251,6 +251,7 @@ namespace NppDB.MSAccess
         }
 
         public bool IsOpened => _conn != null && _conn.State == ConnectionState.Open;
+        public string DatabaseSystemName => "MSAccess";
         internal INppDBCommandHost CommandHost { get; private set; }
 
         internal OleDbConnection GetConnection()
