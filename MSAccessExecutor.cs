@@ -43,7 +43,7 @@ namespace NppDB.MSAccess
         }
     }
 
-    public class MSAccessExecutor : ISQLExecutor
+    public class MSAccessExecutor : ISqlExecutor
     {
         private Thread _execTh;
         private readonly Func<OleDbConnection> _connector;
