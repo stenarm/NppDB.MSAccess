@@ -1,7 +1,7 @@
 ﻿
 namespace NppDB.MSAccess
 {
-    internal class MSAccessView : MSAccessTable
+    internal class MSAccessView : MsAccessTable
     {
         public MSAccessView()
         {

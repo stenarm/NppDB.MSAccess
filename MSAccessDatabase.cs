@@ -3,9 +3,9 @@ using NppDB.Comm;
 
 namespace NppDB.MSAccess
 {
-    public class MSAccessDatabase : TreeNode, IRefreshable, IMenuProvider
+    public class MsAccessDatabase : TreeNode, IRefreshable, IMenuProvider
     {
-        public MSAccessDatabase()
+        public MsAccessDatabase()
         {
             SelectedImageKey = ImageKey = "Database";
             Refresh();

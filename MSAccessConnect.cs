@@ -62,7 +62,7 @@ namespace NppDB.MSAccess
                              fdlg = new SaveFileDialog { Title = @"New Access File" };
                              resource = Assembly.GetExecutingAssembly().GetManifestResourceStream("NppDB.MSAccess.Resources.empty.accdb");
                              if (resource == null) {
-                                 MessageBox.Show("Error: Embedded empty database resource not found.", "Resource Error", MessageBoxButtons.OK, MessageBoxIcon.Error); return false; }
+                                 MessageBox.Show("Error: Embedded empty database resource not found.", @"Resource Error", MessageBoxButtons.OK, MessageBoxIcon.Error); return false; }
                              fdlg.Filter = @"Access Database (*.accdb)|*.accdb|Access 2000-2003 Database (*.mdb)|*.mdb";
                              fdlg.DefaultExt = "accdb";
                         }
@@ -93,7 +93,7 @@ namespace NppDB.MSAccess
                                 }
                                 catch(Exception ex)
                                 {
-                                     MessageBox.Show($"Failed to create new database file: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                     MessageBox.Show($"Failed to create new database file: {ex.Message}", @"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                                      return false;
                                 }
                             }
@@ -144,7 +144,7 @@ namespace NppDB.MSAccess
                     }
                     catch (Exception ex)
                     {
-                         MessageBox.Show($"An unexpected error occurred while testing the connection:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                         MessageBox.Show($"An unexpected error occurred while testing the connection:\n{ex.Message}", @"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                          return false;
                     }
                 }
@@ -197,7 +197,7 @@ namespace NppDB.MSAccess
             {
                 _engineVersion = null;
                 var errorDetails = $"Connect FAILED (OleDbException):\n\nErrorCode: {oleEx.ErrorCode}\nHResult: {oleEx.HResult}\nMessage: {oleEx.Message}\n\nConnectionString Used (masked):\n{maskedConnectionString}";
-                MessageBox.Show(errorDetails, "Connect OLEDB Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(errorDetails, @"Connect OLEDB Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
                 if (_conn == null) throw;
                 _conn.Dispose(); _conn = null;
@@ -207,7 +207,7 @@ namespace NppDB.MSAccess
             {
                 _engineVersion = null;
                 var errorDetails = $"Connect FAILED (Generic Exception):\n\nType: {ex.GetType().Name}\nMessage: {ex.Message}\n\nConnectionString Used (masked):\n{maskedConnectionString}";
-                MessageBox.Show(errorDetails, "Connect Generic Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(errorDetails, @"Connect Generic Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
                 if (_conn == null) throw;
                 _conn.Dispose(); _conn = null;
@@ -217,13 +217,13 @@ namespace NppDB.MSAccess
 
         public void Attach()
         {
-            var id = CommandHost.Execute(NppDBCommandType.GetAttachedBufferID, null);
+            var id = CommandHost.Execute(NppDbCommandType.GetAttachedBufferID, null);
             if (id != null)
             {
-                CommandHost.Execute(NppDBCommandType.NewFile, null);
+                CommandHost.Execute(NppDbCommandType.NewFile, null);
             }
-            id = CommandHost.Execute(NppDBCommandType.GetActivatedBufferID, null);
-            CommandHost.Execute(NppDBCommandType.CreateResultView, new[] { id, this, CreateSqlExecutor() });
+            id = CommandHost.Execute(NppDbCommandType.GetActivatedBufferID, null);
+            CommandHost.Execute(NppDbCommandType.CreateResultView, new[] { id, this, CreateSqlExecutor() });
         }
 
         public string ConnectAndAttach()
@@ -298,7 +298,7 @@ namespace NppDB.MSAccess
                     Nodes.Clear();
                     foreach (DataRow row in dt.Rows)
                     {
-                        var db = new MSAccessDatabase { Text = row["CATALOG_NAME"].ToString() };
+                        var db = new MsAccessDatabase { Text = row["CATALOG_NAME"].ToString() };
                         Nodes.Add(db);
                     }
                 }
@@ -306,7 +306,7 @@ namespace NppDB.MSAccess
                 {
                     Console.WriteLine(ex.Message);
                     Nodes.Clear();
-                    Nodes.Add(new MSAccessDatabase { Text = @"default" });
+                    Nodes.Add(new MsAccessDatabase { Text = @"default" });
                 }
                 finally
                 {
@@ -325,28 +325,40 @@ namespace NppDB.MSAccess
             {
                 menuList.Items.Add(new ToolStripButton("Open a new query window", null, (s, e) =>
                 {
-                    host.Execute(NppDBCommandType.NewFile, null);
-                    var id = host.Execute(NppDBCommandType.GetActivatedBufferID, null);
-                    host.Execute(NppDBCommandType.CreateResultView, new[] { id, connect, CreateSqlExecutor() });
+                    try
+                    {
+                        host.Execute(NppDbCommandType.NewFile, null);
+                        var idObj = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
+                        if (idObj == null) return;
+                        var bufferId = (IntPtr)idObj;
+                        host.Execute(NppDbCommandType.CreateResultView, new object[] { bufferId, connect, CreateSqlExecutor() });
+                    }
+                    catch (Exception ex) { Console.WriteLine($@"Error in 'Open new query': {ex.Message}"); }
                 }));
-                if (host.Execute(NppDBCommandType.GetAttachedBufferID, null) == null)
+
+                if (host.Execute(NppDbCommandType.GetAttachedBufferID, null) == null)
                 {
                     menuList.Items.Add(new ToolStripButton("Attach to the open query window", null, (s, e) =>
                     {
-                        var id = host.Execute(NppDBCommandType.GetActivatedBufferID, null);
-                        host.Execute(NppDBCommandType.CreateResultView, new[] { id, connect, CreateSqlExecutor() });
+                        try
+                        {
+                            var idObj = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
+                            if (idObj == null) { Console.WriteLine(@"Attach failed: Could not get Activated Buffer ID."); return; }
+                            var bufferId = (IntPtr)idObj;
+
+                            host.Execute(NppDbCommandType.CreateResultView, new object[] { bufferId, connect, CreateSqlExecutor() });
+                        }
+                        catch (Exception attachEx) { Console.WriteLine($@"Error during Attach: {attachEx.Message}"); }
                     }));
                 }
                 else
                 {
-                    menuList.Items.Add(new ToolStripButton("Detach from the query window", null, (s, e) =>
-                    {
-                        host.Execute(NppDBCommandType.DestroyResultView, null);
-                    }));
+                     menuList.Items.Add(new ToolStripButton("Detach from the query window", null, (s, e) => { try { host.Execute(NppDbCommandType.DestroyResultView, null); } catch (Exception ex) { Console.WriteLine($@"Error during Detach: {ex.Message}"); } }));
                 }
                 menuList.Items.Add(new ToolStripSeparator());
             }
-            menuList.Items.Add(new ToolStripButton("Refresh the database connection", null, (s, e) => { Refresh(); }));
+
+            menuList.Items.Add(new ToolStripButton("Refresh the database connection", null, (s, e) => { try { Refresh(); } catch (Exception ex) { Console.WriteLine($@"Error during Refresh: {ex.Message}"); } }));
             return menuList;
         }
 

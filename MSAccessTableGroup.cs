@@ -19,7 +19,7 @@ namespace NppDB.MSAccess
 
         protected virtual TreeNode CreateTreeNode(DataRow dataRow)
         {
-            return new MSAccessTable
+            return new MsAccessTable
             {
                 Text = dataRow["table_name"].ToString()
             };
@@ -49,7 +49,7 @@ namespace NppDB.MSAccess
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message, "Exception");
+                    MessageBox.Show(ex.Message, @"Exception");
                 }
                 finally
                 {
