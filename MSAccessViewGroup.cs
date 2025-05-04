@@ -4,7 +4,7 @@ using System.Windows.Forms;
 
 namespace NppDB.MSAccess
 {
-    internal class MSAccessViewGroup : MSAccessTableGroup
+    internal class MSAccessViewGroup : MsAccessTableGroup
     {
         public MSAccessViewGroup()
         {

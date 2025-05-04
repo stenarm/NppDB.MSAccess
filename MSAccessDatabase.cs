@@ -14,11 +14,15 @@ namespace NppDB.MSAccess
         public void Refresh()
         {
             Nodes.Clear();
-            Nodes.Add(new MSAccessTableGroup());
-            Nodes.Add(new MSAccessViewGroup());
-            // add other categories as stored procedures
-        }
 
+            var tablesNode = new MsAccessTableGroup();
+            tablesNode.Nodes.Add(new TreeNode(""));
+            Nodes.Add(tablesNode);
+
+            var viewsNode = new MSAccessViewGroup();
+            viewsNode.Nodes.Add(new TreeNode(""));
+            Nodes.Add(viewsNode);
+        }
         public ContextMenuStrip GetMenu()
         {
             var menuList = new ContextMenuStrip { ShowImageMargin = false };

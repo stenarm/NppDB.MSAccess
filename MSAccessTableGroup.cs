@@ -6,9 +6,9 @@ using NppDB.Comm;
 
 namespace NppDB.MSAccess
 {
-    public class MSAccessTableGroup : TreeNode, IRefreshable, IMenuProvider
+    public class MsAccessTableGroup : TreeNode, IRefreshable, IMenuProvider
     {
-        public MSAccessTableGroup()
+        public MsAccessTableGroup()
         {
             SchemaName = OleDbMetaDataCollectionNames.Tables;
             Text = "Tables";
@@ -19,10 +19,14 @@ namespace NppDB.MSAccess
 
         protected virtual TreeNode CreateTreeNode(DataRow dataRow)
         {
-            return new MsAccessTable
+            var tableNode = new MsAccessTable
             {
                 Text = dataRow["table_name"].ToString()
             };
+
+            tableNode.Nodes.Add(new TreeNode(""));
+
+            return tableNode;
         }
 
         public void Refresh()
