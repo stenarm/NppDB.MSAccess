@@ -4,9 +4,9 @@ using System.Windows.Forms;
 
 namespace NppDB.MSAccess
 {
-    internal class MSAccessViewGroup : MsAccessTableGroup
+    internal class MsAccessViewGroup : MsAccessTableGroup
     {
-        public MSAccessViewGroup()
+        public MsAccessViewGroup()
         {
             SchemaName = OleDbMetaDataCollectionNames.Views;
             Text = "Views";
@@ -14,11 +14,12 @@ namespace NppDB.MSAccess
 
         protected override TreeNode CreateTreeNode(DataRow dataRow)
         {
-            return new MSAccessView
+            var viewNode = new MSAccessView
             {
-                Text = dataRow["table_name"].ToString(),
-                Definition = dataRow["view_definition"].ToString(),
+                Text = dataRow["TABLE_NAME"].ToString(),
             };
+
+            return viewNode;
         }
     }
 }

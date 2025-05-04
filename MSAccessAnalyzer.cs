@@ -333,7 +333,6 @@ namespace NppDB.MSAccess
                         && column.columnExpr.functionExpr.functionName.GetText().ToLower().In("sum", "avg", "min", "max", "count"))
                     {
                         command.AddWarning(ctx, ParserMessageType.ONE_ROW_IN_RESULT_WITH_TOP);
-                        continue;
                     }
                 }
             }
@@ -407,7 +406,6 @@ namespace NppDB.MSAccess
                         && column.columnExpr.functionExpr.functionName.GetText().ToLower().In("sum", "avg", "min", "max", "count"))
                     {
                         command.AddWarning(ctx, ParserMessageType.ONE_ROW_IN_RESULT_WITH_TOP);
-                        continue;
                     }
                 }
             }

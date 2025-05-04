@@ -3,7 +3,9 @@ using System.Data;
 using System.Data.OleDb;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Xml.Serialization;
 using NppDB.Comm;
@@ -19,7 +21,9 @@ namespace NppDB.MSAccess
         public string Title { set => Text = value; get => Text; }
         [XmlElement]
         public string ServerAddress { set; get; }
+
         public string Account { set; get; }
+
         [XmlIgnore]
         public string Password { set; get; }
         private OleDbConnection _conn;
@@ -27,7 +31,7 @@ namespace NppDB.MSAccess
 
         public string GetDefaultTitle()
         {
-            return string.IsNullOrEmpty(ServerAddress) ? "" : Path.GetFileName(ServerAddress);
+            return string.IsNullOrEmpty(ServerAddress) ? "MS Access" : Path.GetFileName(ServerAddress);
         }
 
         public Bitmap GetIcon()
@@ -80,7 +84,7 @@ namespace NppDB.MSAccess
 
                         if (fileDialogResult == DialogResult.OK)
                         {
-                            if (resource != null && creatingNewFile)
+                            if (resource != null)
                             {
                                 try
                                 {
@@ -132,15 +136,18 @@ namespace NppDB.MSAccess
                     }
                     catch (OleDbException oleEx)
                     {
-                        if (oleEx.ErrorCode != -2147217900 &&
-                            (oleEx.Message == null || !oleEx.Message.ToLowerInvariant().Contains("password")))
-                            return false;
-                        using (var pdlg = new FrmPassword { VisiblePassword = false })
+                        if (oleEx.ErrorCode == -2147217900 || (oleEx.Message != null && oleEx.Message.ToLowerInvariant().Contains("password")))
                         {
-                            if (pdlg.ShowDialog() != DialogResult.OK) return false;
-                            Password = pdlg.Password;
-                            return true;
+                            using (var pdlg = new FrmPassword { VisiblePassword = false })
+                            {
+                                if (pdlg.ShowDialog() != DialogResult.OK) return false;
+                                Password = pdlg.Password;
+                                return true;
+                            }
                         }
+
+                        MessageBox.Show($"Failed to test connection:\n{oleEx.Message}", @"Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return false;
                     }
                     catch (Exception ex)
                     {
@@ -154,13 +161,17 @@ namespace NppDB.MSAccess
             return true;
         }
 
+
         public void Connect()
         {
             if (_conn != null)
             {
                  if (_conn.State != ConnectionState.Closed)
                  {
-                     try { _conn.Close(); } catch { }
+                     try { _conn.Close(); }
+                     catch
+                     {
+                     }
                  }
                  _conn.Dispose();
                  _conn = null;
@@ -174,7 +185,7 @@ namespace NppDB.MSAccess
             if(connectionStringToUse.IndexOf("Password=", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 try {
-                    maskedConnectionString = System.Text.RegularExpressions.Regex.Replace(connectionStringToUse, @"(Jet\sOLEDB:Database\sPassword=)[^;]+", "$1*****", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    maskedConnectionString = Regex.Replace(connectionStringToUse, @"(Jet\sOLEDB:Database\sPassword=)[^;]+", "$1*****", RegexOptions.IgnoreCase);
                 } catch {
                     maskedConnectionString = connectionStringToUse.Replace(Password,"*****");
                 }
@@ -253,7 +264,49 @@ namespace NppDB.MSAccess
 
         public bool IsOpened => _conn != null && _conn.State == ConnectionState.Open;
 
-        public string DatabaseSystemName => !string.IsNullOrEmpty(_engineVersion) ? $"MSAccess (Engine: {_engineVersion})" : "MSAccess";
+        public string DatabaseSystemName
+        {
+            get
+            {
+                const string baseName = "MSAccess";
+
+                if (string.IsNullOrEmpty(_engineVersion)) return baseName;
+                string accessYear;
+
+                var versionParts = _engineVersion.Split('.');
+                if (versionParts.Length > 0 && int.TryParse(versionParts[0], out var majorVersion))
+                {
+                    switch (majorVersion)
+                    {
+                        case 4:
+                            accessYear = "2000-2003 (Jet 4.0)";
+                            break;
+                        case 12:
+                            accessYear = "2007";
+                            break;
+                        case 14:
+                            accessYear = "2010";
+                            break;
+                        case 15:
+                            accessYear = "2013";
+                            break;
+                        case 16:
+                            accessYear = "2016+";
+                            break;
+                        default:
+                            accessYear = $"(Engine: {_engineVersion})";
+                            break;
+                    }
+                }
+                else
+                {
+                    accessYear = $"(Engine: {_engineVersion})";
+                }
+
+                return $"{baseName} {accessYear}";
+
+            }
+        }
         internal INppDbCommandHost CommandHost { get; private set; }
 
         internal OleDbConnection GetConnection()
@@ -278,7 +331,7 @@ namespace NppDB.MSAccess
                 _engineVersion = null;
             }
         }
-        
+
         public ISqlExecutor CreateSqlExecutor()
         {
             return new MSAccessExecutor(GetConnection);
@@ -288,25 +341,30 @@ namespace NppDB.MSAccess
         {
             using (var conn = GetConnection())
             {
+                if (TreeView == null) return;
+
                 TreeView.Cursor = Cursors.WaitCursor;
                 TreeView.Enabled = false;
+                Nodes.Clear();
+
                 try
                 {
                     conn.Open();
-                    var dt = conn.GetSchema(OleDbMetaDataCollectionNames.Catalogs);
-                    
-                    Nodes.Clear();
-                    foreach (DataRow row in dt.Rows)
+
+                    var dbNode = new MsAccessDatabase { Text = GetDefaultTitle() };
+
+                    if (DatabaseHasChildren(conn))
                     {
-                        var db = new MsAccessDatabase { Text = row["CATALOG_NAME"].ToString() };
-                        Nodes.Add(db);
+                        dbNode.Nodes.Add(new TreeNode(""));
                     }
+
+                    Nodes.Add(dbNode);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
+                    Console.WriteLine($"Error Refreshing MsAccessConnect Node: {ex.Message}");
                     Nodes.Clear();
-                    Nodes.Add(new MsAccessDatabase { Text = @"default" });
+                    Nodes.Add(new TreeNode($"Error: {ex.Message.Split('\n')[0]}") { ImageKey="Error", SelectedImageKey="Error"});
                 }
                 finally
                 {
@@ -315,6 +373,45 @@ namespace NppDB.MSAccess
                 }
             }
         }
+
+
+        /// <summary>
+        /// Checks if the current Access database contains any user Tables or Views.
+        /// </summary>
+        private bool DatabaseHasChildren(OleDbConnection conn)
+        {
+            DataTable dt = null;
+            try
+            {
+                dt = conn.GetSchema(OleDbMetaDataCollectionNames.Tables);
+                if ((from DataRow row in dt.Rows let tableName = row["TABLE_NAME"] as string let tableType = row.Table.Columns.Contains("TABLE_TYPE") ? row["TABLE_TYPE"] as string : "TABLE" where tableType != null && (tableType.ToUpperInvariant() == "TABLE" ||
+                        tableType.ToUpperInvariant() == "BASE TABLE") select tableName).Any(tableName => tableName != null && (!tableName.ToUpperInvariant().StartsWith("MSYS") &&
+                        !tableName.ToUpperInvariant().StartsWith("USYS"))))
+                {
+                    dt.Dispose();
+                    return true;
+                }
+                dt.Dispose();
+
+                dt = conn.GetSchema(OleDbMetaDataCollectionNames.Views);
+                if (dt != null && dt.Rows.Count > 0)
+                {
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking for children in Access DB: {ex.Message}");
+                return true;
+            }
+            finally
+            {
+                 dt?.Dispose();
+            }
+
+            return false;
+        }
+
 
         public ContextMenuStrip GetMenu()
         {
@@ -392,5 +489,4 @@ namespace NppDB.MSAccess
             CommandHost = host;
         }
     }
-
 }

@@ -1,11 +1,14 @@
-﻿namespace NppDB.MSAccess
+﻿using System.ComponentModel;
+using System.Windows.Forms;
+
+namespace NppDB.MSAccess
 {
     partial class FrmPassword
     {
         /// <summary>
         /// Required designer variable.
         /// </summary>
-        private System.ComponentModel.IContainer components = null;
+        private IContainer components = null;
 
         /// <summary>
         /// Clean up any resources being used.
@@ -99,9 +102,9 @@
 
         #endregion
 
-        private System.Windows.Forms.Button btnClose;
-        private System.Windows.Forms.Button btnOK;
-        private System.Windows.Forms.TextBox txtPwd;
-        private System.Windows.Forms.CheckBox cbxShowPwd;
+        private Button btnClose;
+        private Button btnOK;
+        private TextBox txtPwd;
+        private CheckBox cbxShowPwd;
     }
 }
