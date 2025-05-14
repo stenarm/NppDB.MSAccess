@@ -307,6 +307,8 @@ namespace NppDB.MSAccess
 
             }
         }
+
+        public SqlDialect Dialect { get; }
         internal INppDbCommandHost CommandHost { get; private set; }
 
         internal OleDbConnection GetConnection()
@@ -334,7 +336,7 @@ namespace NppDB.MSAccess
 
         public ISqlExecutor CreateSqlExecutor()
         {
-            return new MSAccessExecutor(GetConnection);
+            return new MsAccessExecutor(GetConnection);
         }
 
         public void Refresh()

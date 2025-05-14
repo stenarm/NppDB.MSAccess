@@ -11,7 +11,6 @@ namespace NppDB.MSAccess
 {
     public class MsAccessTable : TreeNode, IRefreshable, IMenuProvider
     {
-        public string Definition { get; set; }
         protected string TypeName { get; set; } = "TABLE";
 
         public MsAccessTable()
@@ -84,10 +83,16 @@ namespace NppDB.MSAccess
                 host.Execute(NppDbCommandType.CreateResultView, new[] { id, connect, connect.CreateSqlExecutor() });
                 host.Execute(NppDbCommandType.ExecuteSQL, new[] { id, query });
             }));
-            menuList.Items.Add(new ToolStripButton("Drop table", null, (s, e) =>
+            menuList.Items.Add(new ToolStripButton("Drop table (RESTRICT)", null, (s, e) =>
             {
                 var id = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
                 var query = $"DROP {TypeName} {Text}";
+                host.Execute(NppDbCommandType.ExecuteSQL, new[] { id, query });
+            }));
+            menuList.Items.Add(new ToolStripButton("Drop table (CASCADE)", null, (s, e) =>
+            {
+                var id = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
+                var query = $"DROP {TypeName} {Text} CASCADE";
                 host.Execute(NppDbCommandType.ExecuteSQL, new[] { id, query });
             }));
             return menuList;
