@@ -66,7 +66,16 @@ namespace NppDB.MSAccess
             if (connect?.CommandHost == null) return menuList;
                     
             var host = connect.CommandHost;
-            menuList.Items.Add(new ToolStripButton("Select top 100 ...", null, (s, e) =>
+            menuList.Items.Add(new ToolStripButton("Select all rows", null, (s, e) =>
+            {
+                host.Execute(NppDbCommandType.NewFile, null);
+                var id = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
+                var query = "SELECT * FROM " + Text;
+                host.Execute(NppDbCommandType.AppendToCurrentView, new object[] { query });
+                host.Execute(NppDbCommandType.CreateResultView, new[] { id, connect, connect.CreateSqlExecutor() });
+                host.Execute(NppDbCommandType.ExecuteSQL, new[] { id, query });
+            }));
+            menuList.Items.Add(new ToolStripButton("Select random 100 rows", null, (s, e) =>
             {
                 host.Execute(NppDbCommandType.NewFile, null);
                 var id = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
@@ -75,7 +84,7 @@ namespace NppDB.MSAccess
                 host.Execute(NppDbCommandType.CreateResultView, new[] { id, connect, connect.CreateSqlExecutor() });
                 host.Execute(NppDbCommandType.ExecuteSQL, new[] { id, query });
             }));
-            menuList.Items.Add(new ToolStripButton("Drop", null, (s, e) =>
+            menuList.Items.Add(new ToolStripButton("Drop table", null, (s, e) =>
             {
                 var id = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
                 var query = $"DROP {TypeName} {Text}";
