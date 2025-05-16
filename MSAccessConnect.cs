@@ -308,7 +308,7 @@ namespace NppDB.MSAccess
             }
         }
 
-        public SqlDialect Dialect { get; }
+        public SqlDialect Dialect => SqlDialect.MS_ACCESS;
         internal INppDbCommandHost CommandHost { get; private set; }
 
         internal OleDbConnection GetConnection()
