@@ -171,6 +171,7 @@ namespace NppDB.MSAccess
                      try { _conn.Close(); }
                      catch
                      {
+                         // ignored
                      }
                  }
                  _conn.Dispose();
@@ -228,13 +229,13 @@ namespace NppDB.MSAccess
 
         public void Attach()
         {
-            var id = CommandHost.Execute(NppDbCommandType.GetAttachedBufferID, null);
+            var id = CommandHost.Execute(NppDbCommandType.GET_ATTACHED_BUFFER_ID, null);
             if (id != null)
             {
-                CommandHost.Execute(NppDbCommandType.NewFile, null);
+                CommandHost.Execute(NppDbCommandType.NEW_FILE, null);
             }
-            id = CommandHost.Execute(NppDbCommandType.GetActivatedBufferID, null);
-            CommandHost.Execute(NppDbCommandType.CreateResultView, new[] { id, this, CreateSqlExecutor() });
+            id = CommandHost.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+            CommandHost.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, this, CreateSqlExecutor() });
         }
 
         public string ConnectAndAttach()
@@ -309,7 +310,9 @@ namespace NppDB.MSAccess
         }
 
         public SqlDialect Dialect => SqlDialect.MS_ACCESS;
-        internal INppDbCommandHost CommandHost { get; private set; }
+        
+        [XmlIgnore]
+        public INppDbCommandHost CommandHost { get; set; }
 
         internal OleDbConnection GetConnection()
         {
@@ -426,33 +429,33 @@ namespace NppDB.MSAccess
                 {
                     try
                     {
-                        host.Execute(NppDbCommandType.NewFile, null);
-                        var idObj = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
+                        host.Execute(NppDbCommandType.NEW_FILE, null);
+                        var idObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                         if (idObj == null) return;
                         var bufferId = (IntPtr)idObj;
-                        host.Execute(NppDbCommandType.CreateResultView, new object[] { bufferId, connect, CreateSqlExecutor() });
+                        host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new object[] { bufferId, connect, CreateSqlExecutor() });
                     }
                     catch (Exception ex) { Console.WriteLine($@"Error in 'Open new query': {ex.Message}"); }
                 }));
 
-                if (host.Execute(NppDbCommandType.GetAttachedBufferID, null) == null)
+                if (host.Execute(NppDbCommandType.GET_ATTACHED_BUFFER_ID, null) == null)
                 {
                     menuList.Items.Add(new ToolStripButton("Attach to the open query window", null, (s, e) =>
                     {
                         try
                         {
-                            var idObj = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
+                            var idObj = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                             if (idObj == null) { Console.WriteLine(@"Attach failed: Could not get Activated Buffer ID."); return; }
                             var bufferId = (IntPtr)idObj;
 
-                            host.Execute(NppDbCommandType.CreateResultView, new object[] { bufferId, connect, CreateSqlExecutor() });
+                            host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new object[] { bufferId, connect, CreateSqlExecutor() });
                         }
                         catch (Exception attachEx) { Console.WriteLine($@"Error during Attach: {attachEx.Message}"); }
                     }));
                 }
                 else
                 {
-                     menuList.Items.Add(new ToolStripButton("Detach from the query window", null, (s, e) => { try { host.Execute(NppDbCommandType.DestroyResultView, null); } catch (Exception ex) { Console.WriteLine($@"Error during Detach: {ex.Message}"); } }));
+                     menuList.Items.Add(new ToolStripButton("Detach from the query window", null, (s, e) => { try { host.Execute(NppDbCommandType.DESTROY_RESULT_VIEW, null); } catch (Exception ex) { Console.WriteLine($@"Error during Detach: {ex.Message}"); } }));
                 }
                 menuList.Items.Add(new ToolStripSeparator());
             }

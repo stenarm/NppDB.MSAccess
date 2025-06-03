@@ -67,33 +67,46 @@ namespace NppDB.MSAccess
             var host = connect.CommandHost;
             menuList.Items.Add(new ToolStripButton("Select all rows", null, (s, e) =>
             {
-                host.Execute(NppDbCommandType.NewFile, null);
-                var id = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
+                host.Execute(NppDbCommandType.NEW_FILE, null);
+                var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                 var query = "SELECT * FROM " + Text;
-                host.Execute(NppDbCommandType.AppendToCurrentView, new object[] { query });
-                host.Execute(NppDbCommandType.CreateResultView, new[] { id, connect, connect.CreateSqlExecutor() });
-                host.Execute(NppDbCommandType.ExecuteSQL, new[] { id, query });
+                host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
+                host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
+                host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
             }));
             menuList.Items.Add(new ToolStripButton("Select random 100 rows", null, (s, e) =>
             {
-                host.Execute(NppDbCommandType.NewFile, null);
-                var id = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
+                host.Execute(NppDbCommandType.NEW_FILE, null);
+                var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
                 var query = "SELECT TOP 100 * FROM " + Text;
-                host.Execute(NppDbCommandType.AppendToCurrentView, new object[] { query });
-                host.Execute(NppDbCommandType.CreateResultView, new[] { id, connect, connect.CreateSqlExecutor() });
-                host.Execute(NppDbCommandType.ExecuteSQL, new[] { id, query });
+                host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
+                host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
+                host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
             }));
             menuList.Items.Add(new ToolStripButton("Drop table (RESTRICT)", null, (s, e) =>
             {
-                var id = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
-                var query = $"DROP {TypeName} {Text}";
-                host.Execute(NppDbCommandType.ExecuteSQL, new[] { id, query });
+                var tableName = Text;
+                var message = $"Are you sure you want to drop the table '{tableName}' RESTRICT?\n" +
+                              "This action cannot be undone and will fail if other objects depend on this table.";
+                if (MessageBox.Show(message, @"Confirm Drop Table", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) !=
+                    DialogResult.Yes) return;
+                var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                var query = $"DROP {TypeName} [{tableName}]";
+                host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
+                (Parent as IRefreshable)?.Refresh();
             }));
             menuList.Items.Add(new ToolStripButton("Drop table (CASCADE)", null, (s, e) =>
             {
-                var id = host.Execute(NppDbCommandType.GetActivatedBufferID, null);
-                var query = $"DROP {TypeName} {Text} CASCADE";
-                host.Execute(NppDbCommandType.ExecuteSQL, new[] { id, query });
+                var tableName = Text;
+                var message = $"Are you sure you want to drop the table '{tableName}' CASCADE?\n" +
+                              "WARNING: This will also drop all dependent objects (e.g., foreign keys referencing this table, related data in other tables if cascading deletes are set up).\n" +
+                              "This action cannot be undone.";
+                if (MessageBox.Show(message, @"Confirm Drop Table with Cascade", MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Exclamation) != DialogResult.Yes) return;
+                var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                var query = $"DROP {TypeName} [{tableName}]";
+                host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
+                (Parent as IRefreshable)?.Refresh();
             }));
             return menuList;
         }
