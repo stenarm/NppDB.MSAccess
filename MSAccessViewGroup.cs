@@ -14,7 +14,7 @@ namespace NppDB.MSAccess
 
         protected override TreeNode CreateTreeNode(DataRow dataRow)
         {
-            var viewNode = new MSAccessView
+            var viewNode = new MsAccessView
             {
                 Text = dataRow["TABLE_NAME"].ToString(),
             };

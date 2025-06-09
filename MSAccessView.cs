@@ -1,9 +1,9 @@
 ﻿
 namespace NppDB.MSAccess
 {
-    internal class MSAccessView : MsAccessTable
+    internal class MsAccessView : MsAccessTable
     {
-        public MSAccessView()
+        public MsAccessView()
         {
             TypeName = "VIEW";
             SelectedImageKey = ImageKey = "Table";

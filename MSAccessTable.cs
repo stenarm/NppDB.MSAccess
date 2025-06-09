@@ -62,52 +62,79 @@ namespace NppDB.MSAccess
             var connect = GetDbConnect();
             menuList.Items.Add(new ToolStripButton("Refresh", null, (s, e) => { Refresh(); }));
             menuList.Items.Add(new ToolStripSeparator());
+
             if (connect?.CommandHost == null) return menuList;
-                    
+
             var host = connect.CommandHost;
+            var objectNameQuoted = $"[{Text}]";
+
             menuList.Items.Add(new ToolStripButton("Select all rows", null, (s, e) =>
             {
                 host.Execute(NppDbCommandType.NEW_FILE, null);
                 var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
-                var query = "SELECT * FROM " + Text;
+                var query = $"SELECT * FROM {objectNameQuoted}";
                 host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
                 host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
                 host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
             }));
-            menuList.Items.Add(new ToolStripButton("Select random 100 rows", null, (s, e) =>
+            menuList.Items.Add(new ToolStripButton("Select top 100 rows", null, (s, e) =>
             {
                 host.Execute(NppDbCommandType.NEW_FILE, null);
                 var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
-                var query = "SELECT TOP 100 * FROM " + Text;
+                var query = $"SELECT TOP 100 * FROM {objectNameQuoted}";
                 host.Execute(NppDbCommandType.APPEND_TO_CURRENT_VIEW, new object[] { query });
                 host.Execute(NppDbCommandType.CREATE_RESULT_VIEW, new[] { id, connect, connect.CreateSqlExecutor() });
                 host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
             }));
-            menuList.Items.Add(new ToolStripButton("Drop table (RESTRICT)", null, (s, e) =>
+            menuList.Items.Add(new ToolStripSeparator());
+
+            var dropObjectText = TypeName == "VIEW" ? "Drop view" : "Drop table";
+
+            menuList.Items.Add(new ToolStripButton($"{dropObjectText} (RESTRICT)", null, (s, e) =>
             {
-                var tableName = Text;
-                var message = $"Are you sure you want to drop the table '{tableName}' RESTRICT?\n" +
-                              "This action cannot be undone and will fail if other objects depend on this table.";
-                if (MessageBox.Show(message, @"Confirm Drop Table", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) !=
-                    DialogResult.Yes) return;
+                var currentObjectName = Text;
+                var message = $"Are you sure you want to {TypeName.ToLower()} '{currentObjectName}' (RESTRICT)?\n" +
+                              $"This action cannot be undone and will fail if other objects depend on this {TypeName.ToLower()}.";
+                if (MessageBox.Show(message, $@"Confirm Drop {TypeName}", MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning) != DialogResult.Yes) return;
                 var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
-                var query = $"DROP {TypeName} [{tableName}]";
+                var query = $"DROP {TypeName} {objectNameQuoted}";
                 host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
-                (Parent as IRefreshable)?.Refresh();
+                System.Threading.Thread.Sleep(500);
+                if (Parent is IRefreshable parentGroupNode)
+                {
+                    parentGroupNode.Refresh();
+                }
+                else if (TreeView != null)
+                {
+                    Remove();
+                }
             }));
-            menuList.Items.Add(new ToolStripButton("Drop table (CASCADE)", null, (s, e) =>
+
+            if (TypeName == "TABLE")
             {
-                var tableName = Text;
-                var message = $"Are you sure you want to drop the table '{tableName}' CASCADE?\n" +
-                              "WARNING: This will also drop all dependent objects (e.g., foreign keys referencing this table, related data in other tables if cascading deletes are set up).\n" +
-                              "This action cannot be undone.";
-                if (MessageBox.Show(message, @"Confirm Drop Table with Cascade", MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Exclamation) != DialogResult.Yes) return;
-                var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
-                var query = $"DROP {TypeName} [{tableName}]";
-                host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
-                (Parent as IRefreshable)?.Refresh();
-            }));
+                menuList.Items.Add(new ToolStripButton("Drop table (CASCADE)", null, (s, e) =>
+                {
+                    var currentTableName = Text;
+                    var message = $"Are you sure you want to drop the table '{currentTableName}' (CASCADE)?\n" +
+                                  "WARNING: MS Access 'DROP TABLE' behaves like RESTRICT by default. To achieve a true CASCADE effect (dropping dependent objects like relationships), those dependencies must often be removed manually *before* dropping the table.\n" +
+                                  "This action cannot be undone.";
+                    if (MessageBox.Show(message, @"Confirm Drop Table", MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Exclamation) != DialogResult.Yes) return;
+                    var id = host.Execute(NppDbCommandType.GET_ACTIVATED_BUFFER_ID, null);
+                    var query = $"DROP {TypeName} {objectNameQuoted}";
+                    host.Execute(NppDbCommandType.EXECUTE_SQL, new[] { id, query });
+                    System.Threading.Thread.Sleep(500);
+                    if (Parent is IRefreshable parentGroupNode)
+                    {
+                        parentGroupNode.Refresh();
+                    }
+                    else if (TreeView != null)
+                    {
+                        Remove();
+                    }
+                }));
+            }
             return menuList;
         }
 
